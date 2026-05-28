@@ -1,3 +1,6 @@
+// C++ 特有文件，Python 端无直接对应。
+// shapelycpp pure native C++ 使用示例 (zero pybind11 dependency).
+
 #include <iostream>
 #include "shapely/geometry/point.h"
 #include "shapely/geometry/linestring.h"

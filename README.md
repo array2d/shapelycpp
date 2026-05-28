@@ -71,21 +71,20 @@ Add `-Ipath/to/shapelycpp` to your compiler flags and include the headers direct
 
 ```
 shapelycpp/
-├── geometry/           # shapely.geometry.* equivalents
-│   ├── point.h
-│   ├── point_impl.h
-│   ├── linestring.h
-│   ├── linestring_impl.h
-│   ├── polygon.h
-│   └── polygon_impl.h
-├── ops/                # shapely.ops.* equivalents
-│   ├── nearest_points.h
-│   ├── nearest_points_impl.h
-│   ├── distance_to_multigeom.h
-│   └── distance_to_multigeom_impl.h
-├── example/            # usage examples
+├── shapely/            # pure native C++ (zero pybind11 dependency)
+│   ├── geometry/
+│   │   ├── point.h
+│   │   ├── linestring.h
+│   │   └── polygon.h
+│   └── ops/
+│       └── nearest_points.h
+├── example/            # native C++ usage examples
 │   ├── CMakeLists.txt
 │   └── main.cpp
+├── tests/              # Python precision alignment tests
+│   ├── module.cpp      # pybind11 test module
+│   ├── test_geometry.py
+│   └── test_ops.py
 ├── CMakeLists.txt      # build & .deb packaging
 └── README.md
 ```

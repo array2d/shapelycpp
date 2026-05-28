@@ -363,15 +363,6 @@ class TestPolygonConstructor:
         poly = make['polygon'](sq)
         assert not poly.is_empty()
 
-    def test_exterior_coords(self, make):
-        atol = 1e-5 if make['dtype'] == np.float32 else 1e-10
-        sq = make_square_coords()
-        poly = make['polygon'](sq)
-        coords = poly.exterior_coords()
-        py_coords = np.array(PyPolygon(sq).exterior.coords)
-        assert np.allclose(np.asarray(coords), py_coords, atol=atol)
-
-
 class TestPolygonDistancePolygon:
     """C++ Polygon.distance(Polygon) vs Python."""
 

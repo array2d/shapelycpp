@@ -28,7 +28,8 @@ target_include_directories(shapelycpp INTERFACE
 target_compile_features(shapelycpp INTERFACE cxx_std_17)
 
 # ---- Install — header-only C++ library --------------------------------------
-install(DIRECTORY geometry ops
+# shapely/     — pure native C++ (zero pybind11 dependency)
+install(DIRECTORY shapely
     DESTINATION include/shapelycpp
     FILES_MATCHING PATTERN "*.h"
 )

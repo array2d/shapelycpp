@@ -1,5 +1,5 @@
 """
-Precision alignment tests for shapely.ops.* (nearest_points, distance_to_multigeom).
+Precision alignment tests for shapely.ops.* (nearest_points).
 
 Each test compares the C++ implementation against Python shapely.ops using
 identical inputs and verifies results match within configured tolerance.
@@ -146,69 +146,3 @@ class TestNearestPointsLineStringPoint:
             assert abs(y1 - py_result[0].y) < 1e-6
             assert abs(x2 - py_result[1].x) < 1e-6
             assert abs(y2 - py_result[1].y) < 1e-6
-
-
-# ======================================================================
-# distance_to_multigeom tests
-# ======================================================================
-
-class TestDistanceToMultiGeom:
-    """C++ ops::distance_to_multigeom(Point, vector<Polygon>) — python equivalent: min(point.distance(p) for p in polys)."""
-
-    def test_single_polygon(self, cpp):
-        sq = make_square_coords(0, 0, 5)
-        pt = cpp.point(10.0, 0.0)
-        poly = cpp.polygon(sq)
-        py_pt = PyPoint(10.0, 0.0)
-        py_poly = PyPolygon(sq)
-
-        cpp_d = cpp.distance_to_multigeom(pt, [poly])
-        py_d = py_pt.distance(py_poly)
-        assert abs(cpp_d - py_d) < 1e-8
-
-    def test_two_polygons(self, cpp):
-        sq1 = make_square_coords(0, 0, 5)    # (-5,-5)-(5,5)
-        sq2 = make_square_coords(20, 0, 5)   # (15,-5)-(25,5)
-        pt = cpp.point(10.0, 0.0)            # halfway between
-        p1 = cpp.polygon(sq1)
-        p2 = cpp.polygon(sq2)
-
-        cpp_d = cpp.distance_to_multigeom(pt, [p1, p2])
-        py_pt = PyPoint(10.0, 0.0)
-        py_p1 = PyPolygon(sq1)
-        py_p2 = PyPolygon(sq2)
-        py_d = min(py_pt.distance(py_p1), py_pt.distance(py_p2))
-        assert abs(cpp_d - py_d) < 1e-8
-
-    def test_inside_one(self, cpp):
-        sq1 = make_square_coords(0, 0, 5)
-        sq2 = make_square_coords(20, 0, 5)
-        pt = cpp.point(0.0, 0.0)  # inside sq1
-        p1 = cpp.polygon(sq1)
-        p2 = cpp.polygon(sq2)
-
-        cpp_d = cpp.distance_to_multigeom(pt, [p1, p2])
-        py_pt = PyPoint(0.0, 0.0)
-        py_p1 = PyPolygon(sq1)
-        py_p2 = PyPolygon(sq2)
-        py_d = min(py_pt.distance(py_p1), py_pt.distance(py_p2))
-        assert abs(cpp_d - py_d) < 1e-8
-
-    def test_many_polygons(self, cpp):
-        rng = np.random.RandomState(99)
-        py_pt = PyPoint(0.0, 0.0)
-        pt = cpp.point(0.0, 0.0)
-
-        polys = []
-        py_polys = []
-        for i in range(5):
-            cx, cy = rng.uniform(-50, 50), rng.uniform(-50, 50)
-            half = rng.uniform(2, 6)
-            sq = [(cx - half, cy - half), (cx + half, cy - half),
-                  (cx + half, cy + half), (cx - half, cy + half)]
-            polys.append(cpp.polygon(sq))
-            py_polys.append(PyPolygon(sq))
-
-        cpp_d = cpp.distance_to_multigeom(pt, polys)
-        py_d = min(py_pt.distance(p) for p in py_polys)
-        assert abs(cpp_d - py_d) < 1e-8
