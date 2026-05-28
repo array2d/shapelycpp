@@ -1,5 +1,18 @@
 cmake_minimum_required(VERSION 3.16)
-project(shapelycpp VERSION 0.1.0 LANGUAGES CXX)
+
+# -- Auto-detect version from pip's shapely -----------------------------------
+execute_process(
+    COMMAND python3 -c "import shapely; print(shapely.__version__)"
+    OUTPUT_VARIABLE SHAPELY_PIP_VERSION
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+    RESULT_VARIABLE _pip_rc
+)
+if(NOT _pip_rc EQUAL 0 OR SHAPELY_PIP_VERSION STREQUAL "")
+    message(FATAL_ERROR "Cannot detect shapely version from pip. Install shapely first: pip install shapely")
+endif()
+
+project(shapelycpp VERSION ${SHAPELY_PIP_VERSION} LANGUAGES CXX)
 
 # C++17
 set(CMAKE_CXX_STANDARD 17)
