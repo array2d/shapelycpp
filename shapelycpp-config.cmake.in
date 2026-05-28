@@ -1,0 +1,16 @@
+@PACKAGE_INIT@
+
+add_library(shapelycpp INTERFACE IMPORTED)
+
+set_target_properties(shapelycpp PROPERTIES
+    IMPORTED_GLOBAL TRUE
+    INTERFACE_COMPILE_FEATURES "cxx_std_17"
+    INTERFACE_INCLUDE_DIRECTORIES "${PACKAGE_PREFIX_DIR}/include/shapelycpp"
+)
+
+add_library(shapelycpp::shapelycpp ALIAS shapelycpp)
+
+# Fallback variables
+set(shapelycpp_INCLUDE_DIRS "${PACKAGE_PREFIX_DIR}/include/shapelycpp")
+
+check_required_components(shapelycpp)
