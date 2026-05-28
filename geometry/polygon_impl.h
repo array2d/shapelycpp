@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "shapely/geometry/linestring.h"
+#include "geometry/linestring.h"
 
 #include <geos/geom/GeometryFactory.h>
 #include <geos/geom/Polygon.h>
@@ -141,9 +141,9 @@ py::array_t<T> Polygon<T>::exterior_coords() const
         return empty;
     }
     size_t n = cs->getSize();
-    py::array_t<T> result(std::vector<py::ssize_t>{static_cast<py::ssize_t>(n - 1), static_cast<py::ssize_t>(2)});
+    py::array_t<T> result(std::vector<py::ssize_t>{static_cast<py::ssize_t>(n), static_cast<py::ssize_t>(2)});
     T *p = static_cast<T *>(result.request().ptr);
-    for (size_t i = 0; i < n - 1; ++i) {
+    for (size_t i = 0; i < n; ++i) {
         p[i * 2] = static_cast<T>(cs->getAt(i).x);
         p[i * 2 + 1] = static_cast<T>(cs->getAt(i).y);
     }

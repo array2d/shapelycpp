@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include "shapely/geometry/polygon.h"
-#include "shapely/geometry/linestring.h"
-#include "shapely/geometry/point.h"
+#include "geometry/polygon.h"
+#include "geometry/linestring.h"
+#include "geometry/point.h"
 
 #include <geos/geom/GeometryFactory.h>
 #include <geos/geom/Polygon.h>

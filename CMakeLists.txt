@@ -83,6 +83,12 @@ add_custom_target(deb
     COMMENT "Packaging shapelycpp-dev-${CPACK_PACKAGE_VERSION}-Linux.deb"
 )
 
+# ---- Tests (optional, requires pybind11 + GEOS) ------------------------------
+option(BUILD_TESTS "Build pybind11 test module" OFF)
+if(BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
+
 message(STATUS "shapelycpp v${PROJECT_VERSION}  (header-only C++ library)")
 message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "  DEB:  make deb  →  shapelycpp-dev-${CPACK_PACKAGE_VERSION}-Linux.deb")
