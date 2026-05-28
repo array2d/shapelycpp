@@ -51,6 +51,8 @@ public:
 
     Point<double> interpolate(double distance) const;
 
+    Polygon<double> buffer(double distance) const;
+
     double length() const;
 
     py::array_t<T> coords_;

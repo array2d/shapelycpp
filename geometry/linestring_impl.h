@@ -93,6 +93,45 @@ Point<double> LineString<T>::interpolate(double distance) const
 }
 
 template <typename T>
+Polygon<double> LineString<T>::buffer(double distance) const
+{
+    if (!geos_linestring_ || geos_linestring_->isEmpty()) {
+        return std::move(Polygon<double>(py::array_t<double>(std::vector<py::ssize_t>{0, 2})));
+    }
+    auto buf_geom = geos_linestring_->buffer(distance, 16);
+    if (buf_geom == nullptr || buf_geom->isEmpty())
+        return std::move(Polygon<double>(py::array_t<double>(std::vector<py::ssize_t>{0, 2})));
+
+    const geos::geom::Geometry *poly = buf_geom.get();
+    if (poly->getGeometryTypeId() != geos::geom::GEOS_POLYGON)
+    {
+        if (poly->getNumGeometries() > 0)
+            poly = poly->getGeometryN(0);
+    }
+
+    if (poly->getGeometryTypeId() != geos::geom::GEOS_POLYGON || poly->isEmpty())
+        return std::move(Polygon<double>(py::array_t<double>(std::vector<py::ssize_t>{0, 2})));
+
+    const geos::geom::Polygon *geos_poly = dynamic_cast<const geos::geom::Polygon *>(poly);
+    if (!geos_poly)
+        return std::move(Polygon<double>(py::array_t<double>(std::vector<py::ssize_t>{0, 2})));
+
+    const geos::geom::CoordinateSequence *cs = geos_poly->getExteriorRing()->getCoordinatesRO();
+    if (!cs || cs->isEmpty())
+        return std::move(Polygon<double>(py::array_t<double>(std::vector<py::ssize_t>{0, 2})));
+
+    size_t n = cs->getSize();
+    py::array_t<double> coords(std::vector<py::ssize_t>{static_cast<py::ssize_t>(n - 1), static_cast<py::ssize_t>(2)});
+    double *p = static_cast<double *>(coords.request().ptr);
+    for (size_t i = 0; i < n - 1; ++i) {
+        p[i * 2] = cs->getAt(i).x;
+        p[i * 2 + 1] = cs->getAt(i).y;
+    }
+
+    return std::move(Polygon<double>(coords));
+}
+
+template <typename T>
 double LineString<T>::length() const
 {
     return geos_linestring_->getLength();

@@ -55,7 +55,7 @@ double Point<T>::distance(const Polygon<U>& other) const
 template <typename T>
 Polygon<double> Point<T>::buffer(double distance) const
 {
-    auto buf_geom = geos_point_->buffer(distance);
+    auto buf_geom = geos_point_->buffer(distance, 16);
     if (buf_geom == nullptr || buf_geom->isEmpty())
         return std::move(Polygon<double>(py::array_t<double>(std::vector<py::ssize_t>{0, 2})));
 

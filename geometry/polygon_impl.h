@@ -174,7 +174,7 @@ Polygon<double> Polygon<T>::buffer(double distance) const
     if (!geos_polygon_->isValid() || !geos_polygon_->isSimple()) {
         return std::move(Polygon<double>(py::array_t<double>(std::vector<py::ssize_t>{0, 2})));
     }
-    buf_geom = geos_polygon_->buffer(distance);
+    buf_geom = geos_polygon_->buffer(distance, 16);
     if (buf_geom == nullptr || buf_geom->isEmpty())
         return std::move(Polygon<double>(py::array_t<double>(std::vector<py::ssize_t>{0, 2})));
 
