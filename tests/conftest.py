@@ -1,10 +1,5 @@
 """
 Pytest fixtures and hooks for shapelycpp precision alignment tests.
-
-Usage:
-  pytest tests/                              # run all tests
-  pytest tests/ --cpp-module=my_module       # custom C++ module name
-  pytest tests/ --rtol=1e-10 --atol=1e-10    # custom tolerances
 """
 
 import numpy as np
@@ -12,52 +7,33 @@ import pytest
 
 
 def pytest_addoption(parser):
-    parser.addoption(
-        "--cpp-module", action="store", default=None,
-        help="Python module name for the compiled C++ shapelycpp library (default: shapelycpp)",
-    )
-    parser.addoption(
-        "--rtol", action="store", type=float, default=1e-10,
-        help="Relative tolerance for numerical comparisons (default: 1e-10)",
-    )
-    parser.addoption(
-        "--atol", action="store", type=float, default=1e-10,
-        help="Absolute tolerance for numerical comparisons (default: 1e-10)",
-    )
-
+    parser.addoption("--cpp-module", action="store", default=None,
+        help="Python module name for the compiled C++ shapelycpp library")
+    parser.addoption("--rtol", action="store", type=float, default=1e-10)
+    parser.addoption("--atol", action="store", type=float, default=1e-10)
 
 # -- Lazy C++ module import ---------------------------------------------------
 
 _cpp_module = None
 _import_error = None
 
-
-def _resolve_module_name(config) -> str:
+def _resolve_module_name(config):
     import os
     cli = config.getoption("--cpp-module", default=None)
-    if cli:
-        return cli
+    if cli: return cli
     env = os.environ.get("SHAPELYCPP_MODULE")
-    if env:
-        return env
+    if env: return env
     return "shapelycpp"
 
-
 def get_cpp_module(request=None):
-    """Return the compiled shapelycpp C++ module (lazy, cached)."""
     global _cpp_module, _import_error
-
-    if _cpp_module is not None:
-        return _cpp_module
-    if _import_error is not None:
-        raise _import_error
-
+    if _cpp_module is not None: return _cpp_module
+    if _import_error is not None: raise _import_error
     if request is not None:
         modname = _resolve_module_name(request.config)
     else:
         import os
         modname = os.environ.get("SHAPELYCPP_MODULE", "shapelycpp")
-
     import importlib
     try:
         _cpp_module = importlib.import_module(modname)
@@ -66,52 +42,57 @@ def get_cpp_module(request=None):
         raise
     return _cpp_module
 
-
 # -- Fixtures ------------------------------------------------------------------
-
 
 @pytest.fixture(scope="session")
 def cpp():
-    """Session-scoped C++ module fixture."""
     return get_cpp_module()
-
 
 @pytest.fixture
 def rtol(request):
     return request.config.getoption("--rtol", default=1e-10)
 
-
 @pytest.fixture
 def atol(request):
     return request.config.getoption("--atol", default=1e-10)
 
-
 @pytest.fixture(params=[np.float64, np.float32], ids=["float64", "float32"])
 def dtype(request):
-    """Parametrized fixture: each test runs once with float64 and once with float32."""
     return request.param
-
 
 @pytest.fixture(params=[np.float64, np.float32], ids=["float64", "float32"])
 def make(cpp, request):
     """Parametrized fixture providing float64/float32 geometry factories and classes."""
     if request.param == np.float64:
         return {
-            'point': cpp.point,
-            'linestring': cpp.linestring,
-            'polygon': cpp.polygon,
-            'Point': cpp.Point,
-            'LineString': cpp.LineString,
-            'Polygon': cpp.Polygon,
+            'point': cpp.point, 'linestring': cpp.linestring, 'polygon': cpp.polygon,
+            'Point': cpp.Point, 'LineString': cpp.LineString, 'Polygon': cpp.Polygon,
             'dtype': np.float64,
         }
     else:
         return {
-            'point': cpp.point_f32,
-            'linestring': cpp.linestring_f32,
-            'polygon': cpp.polygon_f32,
-            'Point': cpp.PointF32,
-            'LineString': cpp.LineStringF32,
-            'Polygon': cpp.PolygonF32,
+            'point': cpp.point_f32, 'linestring': cpp.linestring_f32, 'polygon': cpp.polygon_f32,
+            'Point': cpp.PointF32, 'LineString': cpp.LineStringF32, 'Polygon': cpp.PolygonF32,
             'dtype': np.float32,
         }
+
+# -- CppFactory convenience wrapper -------------------------------------------
+
+class CppFactory:
+    def __init__(self, cpp_mod):
+        self.m = cpp_mod
+    def point(self, x, y, dtype='double'):
+        if dtype == 'float32': return self.m.point_f32(float(x), float(y))
+        return self.m.point(float(x), float(y))
+    def linestring(self, coords, dtype='double'):
+        if dtype == 'float32': return self.m.linestring_f32(coords)
+        return self.m.linestring(coords)
+    def polygon(self, coords, dtype='double'):
+        if dtype == 'float32': return self.m.polygon_f32(coords)
+        return self.m.polygon(coords)
+    def linearring(self, coords):
+        return self.m.linearring(coords)
+
+@pytest.fixture(scope='session')
+def C(cpp):
+    return CppFactory(cpp)

@@ -115,3 +115,44 @@ def py_polygon(coords=None):
     if coords is None:
         coords = make_square_coords()
     return PyPolygon(coords)
+
+
+# ---- Extended helpers for full API tests ------------------------------------
+
+import shapely.geometry as sg
+
+
+def py_linearring(coords):
+    return sg.LinearRing(coords)
+
+
+def assert_almost_equal(a, b, tol=1e-8, msg=""):
+    """Compare scalars or sequences with tolerance."""
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        assert len(a) == len(b), f"Length mismatch: {len(a)} vs {len(b)} {msg}"
+        for i, (ai, bi) in enumerate(zip(a, b)):
+            assert abs(ai - bi) < tol, f"Mismatch at index {i}: {ai} vs {bi} {msg}"
+    else:
+        assert abs(a - b) < tol, f"{a} != {b} {msg}"
+
+
+def random_point(rng, x_range=(-100, 100), y_range=None):
+    if y_range is None:
+        y_range = x_range
+    return (rng.uniform(*x_range), rng.uniform(*y_range))
+
+
+def random_line(rng, npts=3, x_range=(-100, 100), y_range=(-100, 100)):
+    return [(rng.uniform(*x_range), rng.uniform(*y_range)) for _ in range(npts)]
+
+
+def random_polygon(rng, npts=4, x_range=(-100, 100), y_range=(-100, 100)):
+    """Generate a convex-ish polygon with npts vertices."""
+    center = (rng.uniform(*x_range), rng.uniform(*y_range))
+    angles = sorted(rng.uniform(0, 2*np.pi, npts))
+    radii = rng.uniform(1, 20, npts)
+    pts = [(center[0] + r*np.cos(a), center[1] + r*np.sin(a)) for a, r in zip(angles, radii)]
+    poly = PyPolygon(pts)
+    if poly.is_valid and not poly.is_empty:
+        return list(poly.exterior.coords)
+    return pts
