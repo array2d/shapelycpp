@@ -1,4 +1,5 @@
 // Python Source: shapely/geometry/point.py
+// Line Range: L16-L194 (class Point + PointAdapter)
 // Alignment: strict
 // EXEMPTION: cpp_template_optimization
 // Reason: C++ template for float32/float64 coordinate support.
@@ -129,7 +130,7 @@ private:
 
 #include "shapely/geometry/linestring.h"
 #include "shapely/geometry/polygon.h"
-#include "shapely/detail/geos_utils.h"
+#include "shapely/geometry/base.h"
 
 #include <geos/geom/LineString.h>
 #include <geos/geom/Polygon.h>
@@ -142,6 +143,7 @@ private:
 namespace shapely {
 namespace geometry {
 
+// Python: shapely/geometry/point.py::__init__:L38
 // -- Constructor -------------------------------------------------------------
 
 template <typename T>
@@ -151,6 +153,7 @@ Point<T>::Point(T px, T py) : x(px), y(py) {
         geos::geom::Coordinate(static_cast<double>(px), static_cast<double>(py))));
 }
 
+// Python: shapely/geometry/point.py::_get_coords:L160
 // -- coords, xy -------------------------------------------------------------
 
 template <typename T>
@@ -158,11 +161,13 @@ std::vector<std::tuple<T, T>> Point<T>::coords() const {
     return {std::make_tuple(x, y)};
 }
 
+// Python: shapely/geometry/point.py::xy:L182
 template <typename T>
 std::tuple<std::vector<T>, std::vector<T>> Point<T>::xy() const {
     return {{x}, {y}};
 }
 
+// Python: shapely/geometry/base.py::distance:L438
 // -- distance ----------------------------------------------------------------
 
 template <typename T>
@@ -183,6 +188,7 @@ double Point<T>::distance(const Polygon<U>& other) const {
     return op.distance();
 }
 
+// Python: shapely/geometry/base.py::buffer:L541
 // -- buffer ------------------------------------------------------------------
 
 template <typename T>
@@ -204,6 +210,7 @@ Polygon<double> Point<T>::buffer(double distance) const {
     return Polygon<double>(c.data(), n, 2);
 }
 
+// Python: shapely/geometry/base.py predicates L753-L813
 // -- Predicates (macros to reduce boilerplate) -------------------------------
 
 #define SHAPELY_PRED_IMPL(METHOD, GEOS_FN) \
@@ -214,6 +221,8 @@ bool Point<T>::METHOD(const LineString<U>& o) const { return detail::GEOS_FN(geo
 template <typename T> template <typename U> \
 bool Point<T>::METHOD(const Polygon<U>& o) const { return detail::GEOS_FN(geos_point_.get(), o.geos_polygon_.get()); }
 
+// Python: base.py::contains:L766, within:L813, crosses:L770, disjoint:L774
+// Python: base.py::overlaps:L805, touches:L809, covers:L758, covered_by:L762, equals:L778
 SHAPELY_PRED_IMPL(contains,    geos_contains)
 SHAPELY_PRED_IMPL(within,      geos_within)
 SHAPELY_PRED_IMPL(crosses,     geos_crosses)
@@ -226,6 +235,7 @@ SHAPELY_PRED_IMPL(equals,      geos_equals)
 
 #undef SHAPELY_PRED_IMPL
 
+// Python: shapely/geometry/base.py::equals_exact:L817
 // equals_exact
 template <typename T> template <typename U>
 bool Point<T>::equals_exact(const Point<U>& o, double tol) const { return detail::geos_equals_exact(geos_point_.get(), o.geos_point_.get(), tol); }
@@ -234,11 +244,13 @@ bool Point<T>::equals_exact(const LineString<U>& o, double tol) const { return d
 template <typename T> template <typename U>
 bool Point<T>::equals_exact(const Polygon<U>& o, double tol) const { return detail::geos_equals_exact(geos_point_.get(), o.geos_polygon_.get(), tol); }
 
+// Python: shapely/geometry/base.py::intersects:L801
 // intersects
 template <typename T> bool Point<T>::intersects(const Point& o) const { return geos_point_->intersects(o.geos_point_.get()); }
 template <typename T> template <typename U> bool Point<T>::intersects(const LineString<U>& o) const { return geos_point_->intersects(o.geos_linestring_.get()); }
 template <typename T> template <typename U> bool Point<T>::intersects(const Polygon<U>& o) const { return geos_point_->intersects(o.geos_polygon_.get()); }
 
+// Python: shapely/geometry/base.py::relate:L753, relate_pattern:L890
 // -- relate / relate_pattern ------------------------------------------------
 
 #define SHAPELY_RELATE_IMPL \
@@ -258,6 +270,7 @@ bool Point<T>::relate_pattern(const Polygon<U>& o, const std::string& p) const {
 SHAPELY_RELATE_IMPL
 #undef SHAPELY_RELATE_IMPL
 
+// Python: shapely/geometry/base.py::hausdorff_distance:L442
 // -- hausdorff_distance -----------------------------------------------------
 
 template <typename T> template <typename U>
@@ -267,23 +280,37 @@ double Point<T>::hausdorff_distance(const LineString<U>& o) const { return detai
 template <typename T> template <typename U>
 double Point<T>::hausdorff_distance(const Polygon<U>& o) const { return detail::geos_hausdorff_distance(geos_point_.get(), o.geos_polygon_.get()); }
 
+// Python: shapely/geometry/base.py accessors L365-L447
 // -- Accessors ---------------------------------------------------------------
 
+// Python: base.py::wkt:L369
 template <typename T> std::string Point<T>::wkt() const { return detail::geos_to_wkt(geos_point_.get()); }
+// Python: base.py::wkb_hex:L379
 template <typename T> std::string Point<T>::wkb_hex() const { return detail::geos_to_wkb_hex(geos_point_.get()); }
+// Python: base.py::type:L365
 template <typename T> std::string Point<T>::type() const { return "Point"; }
+// Python: base.py::geom_type:L426
 template <typename T> std::string Point<T>::geom_type() const { return detail::geos_geom_type(geos_point_.get()); }
+// Python: base.py::has_z:L708
 template <typename T> bool        Point<T>::has_z() const { return detail::geos_has_z(geos_point_.get()); }
 
+// Python: shapely/geometry/base.py properties L714-L470
 // -- Properties --------------------------------------------------------------
 
+// Python: base.py::is_empty:L714
 template <typename T> bool        Point<T>::is_empty() const { return detail::geos_is_empty(geos_point_.get()); }
+// Python: base.py::is_simple:L739
 template <typename T> bool        Point<T>::is_simple() const { return detail::geos_is_simple(geos_point_.get()); }
+// Python: base.py::is_valid:L745
 template <typename T> bool        Point<T>::is_valid() const { return detail::geos_is_valid(geos_point_.get()); }
+// Python: base.py::area:L434
 template <typename T> double      Point<T>::area() const { return 0.0; }
+// Python: base.py::length:L447
 template <typename T> double      Point<T>::length() const { return 0.0; }
+// Python: base.py::bounds:L470
 template <typename T> std::vector<double> Point<T>::bounds() const { return detail::geos_bounds(geos_point_.get()); }
 
+// Python: shapely/geometry/base.py::centroid:L478
 // -- Centroid ----------------------------------------------------------------
 
 template <typename T>
@@ -294,6 +321,7 @@ Point<double> Point<T>::centroid() const {
     return Point<double>(coord->x, coord->y);
 }
 
+// Python: shapely/geometry/base.py::normalize:L663
 // -- Normalize ---------------------------------------------------------------
 
 template <typename T>

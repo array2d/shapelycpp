@@ -1,5 +1,5 @@
 // Python Source: shapely/ops.py
-// Line Range: def nearest_points L328-L355
+// Line Range: L328-L355
 // Alignment: strict
 // EXEMPTION: cpp_template_optimization
 // Reason: C++ template to support both float32 and double coordinates.

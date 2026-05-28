@@ -1,4 +1,8 @@
-// pybind11 module for shapelycpp testing.
+// Python Source: N/A — C++ test utility (pybind11 binding)
+// Alignment: exempt (P09)
+// Reason: pybind11 binding module for testing shapelycpp against Python shapely.
+//         Python shapely is a pip-installed C library with Python wrappers;
+//         no direct Python module corresponds to this C++ pybind11 glue code.
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
@@ -9,7 +13,6 @@
 #include "shapely/geometry/point.h"
 #include "shapely/geometry/linestring.h"
 #include "shapely/geometry/polygon.h"
-#include "shapely/geometry/linearring.h"
 #include "shapely/ops/nearest_points.h"
 
 namespace py = pybind11;

@@ -1,4 +1,5 @@
 // Python Source: shapely/geometry/polygon.py
+// Line Range: L23-L380 (class LinearRing + Polygon + adapters)
 // Alignment: strict
 // EXEMPTION: cpp_template_optimization
 // Reason: C++ template for float32/float64 coordinate support.
@@ -12,6 +13,7 @@
 #include <cstddef>
 #include <geos/geom/GeometryFactory.h>
 #include <geos/geom/Polygon.h>
+#include <geos/geom/LinearRing.h>
 
 namespace shapely {
 namespace geometry {
@@ -22,9 +24,74 @@ template <typename T> class LineString;
 #ifndef SHAPELY_GEOMETRY_POINT_DEFINED
 template <typename T> class Point;
 #endif
-#ifndef SHAPELY_GEOMETRY_LINEARRING_DEFINED
-template <typename T> class LinearRing;
-#endif
+
+// ============================================================================
+// LinearRing (Python: shapely/geometry/polygon.py L23-L107)
+// ============================================================================
+
+template <typename T = double>
+class LinearRing {
+public:
+    /// Empty ring
+    LinearRing();
+
+    /// Construct from raw coordinate array [rows x cols]. Ring will be auto-closed.
+    LinearRing(const T* coords, size_t rows, size_t cols = 2);
+
+    LinearRing(LinearRing&&) = default;
+    LinearRing& operator=(LinearRing&&) = default;
+
+    // -- Raw coordinate access --
+    const T* data() const { return coords_.data(); }
+    size_t rows() const { return rows_; }
+    size_t cols() const { return cols_; }
+
+    // -- coords, xy --
+    std::vector<std::tuple<T, T>> coords() const;
+    std::tuple<std::vector<T>, std::vector<T>> xy() const;
+
+    // -- Properties --
+    bool is_empty() const;
+    bool is_simple() const;
+    bool is_valid() const;
+    bool is_closed() const;
+    bool is_ring() const;
+    bool is_ccw() const;
+    double area() const;
+    double length() const;
+    std::vector<double> bounds() const;
+
+    // -- Accessors --
+    std::string wkt() const;
+    std::string wkb_hex() const;
+    std::string type() const;
+    std::string geom_type() const;
+    bool has_z() const;
+
+    // -- Methods --
+    Point<double> centroid() const;
+    void normalize();
+
+private:
+    template <typename U> friend class Polygon;
+    template <typename U> friend class LineString;
+    std::vector<T> coords_;
+    size_t rows_ = 0, cols_ = 0;
+    std::unique_ptr<geos::geom::LinearRing> geos_ring_;
+    geos::geom::GeometryFactory::Ptr factory_;
+};
+
+} // namespace geometry
+} // namespace shapely
+
+#define SHAPELY_GEOMETRY_LINEARRING_DEFINED
+
+// ============================================================================
+// Polygon (Python: shapely/geometry/polygon.py L218-L380)
+// ============================================================================
+
+namespace shapely {
+namespace geometry {
 
 template <typename T = double>
 class Polygon {
@@ -142,8 +209,7 @@ private:
 
 #include "shapely/geometry/linestring.h"
 #include "shapely/geometry/point.h"
-#include "shapely/geometry/linearring.h"
-#include "shapely/detail/geos_utils.h"
+#include "shapely/geometry/base.h"
 
 #include <geos/geom/LineString.h>
 #include <geos/geom/Point.h>
@@ -152,12 +218,120 @@ private:
 #include <geos/geom/CoordinateSequenceFactory.h>
 #include <geos/geom/LinearRing.h>
 #include <geos/operation/distance/DistanceOp.h>
+#include <geos/algorithm/Orientation.h>
 #include <geos/util/TopologyException.h>
 #include <stdexcept>
 
 namespace shapely {
 namespace geometry {
 
+// ============================================================================
+// LinearRing implementation
+// ============================================================================
+
+// Python: shapely/geometry/polygon.py::LinearRing::__init__:L31
+template <typename T>
+LinearRing<T>::LinearRing() {
+    factory_ = geos::geom::GeometryFactory::create();
+    auto cs = factory_->getCoordinateSequenceFactory()->create(std::size_t(0), std::size_t(2));
+    geos_ring_ = factory_->createLinearRing(std::move(cs));
+}
+
+template <typename T>
+LinearRing<T>::LinearRing(const T* coords, size_t rows, size_t cols)
+    : coords_(coords, coords + rows * cols), rows_(rows), cols_(cols)
+{
+    factory_ = geos::geom::GeometryFactory::create();
+    if (rows < 3 || cols < 2) {
+        auto cs = factory_->getCoordinateSequenceFactory()->create(std::size_t(0), std::size_t(2));
+        geos_ring_ = factory_->createLinearRing(std::move(cs));
+        return;
+    }
+
+    // Check if already closed; if not, close it
+    bool already_closed = (coords_[0] == coords_[(rows-1)*cols] && coords_[1] == coords_[(rows-1)*cols+1]);
+    size_t crd_n = already_closed ? rows : rows + 1;
+
+    auto cs = factory_->getCoordinateSequenceFactory()->create(crd_n, 2);
+    for (size_t i = 0; i < rows; ++i)
+        cs->setAt(geos::geom::Coordinate(static_cast<double>(coords_[i*cols]),
+                                          static_cast<double>(coords_[i*cols+1])), i);
+    if (!already_closed)
+        cs->setAt(geos::geom::Coordinate(static_cast<double>(coords_[0]),
+                                          static_cast<double>(coords_[1])), rows);
+
+    geos_ring_ = factory_->createLinearRing(std::move(cs));
+}
+
+// Python: shapely/geometry/polygon.py::LinearRing::_get_coords:L69
+// -- coords, xy -------------------------------------------------------------
+
+template <typename T>
+std::vector<std::tuple<T, T>> LinearRing<T>::coords() const {
+    std::vector<std::tuple<T, T>> r; r.reserve(rows_);
+    for (size_t i = 0; i < rows_; ++i) r.emplace_back(coords_[i*cols_], coords_[i*cols_+1]);
+    return r;
+}
+
+template <typename T>
+std::tuple<std::vector<T>, std::vector<T>> LinearRing<T>::xy() const {
+    std::vector<T> xs(rows_), ys(rows_);
+    for (size_t i = 0; i < rows_; ++i) { xs[i]=coords_[i*cols_]; ys[i]=coords_[i*cols_+1]; }
+    return {xs, ys};
+}
+
+// Python: shapely/geometry/base.py properties L714-L719
+// -- Properties --------------------------------------------------------------
+
+// is_empty:L714, is_simple:L739, is_valid:L745, is_closed:L724, is_ring:L719
+template <typename T> bool LinearRing<T>::is_empty() const { return detail::geos_is_empty(geos_ring_.get()); }
+template <typename T> bool LinearRing<T>::is_simple() const { return detail::geos_is_simple(geos_ring_.get()); }
+template <typename T> bool LinearRing<T>::is_valid() const { return detail::geos_is_valid(geos_ring_.get()); }
+template <typename T> bool LinearRing<T>::is_closed() const { return geos_ring_->isClosed(); }
+template <typename T> bool LinearRing<T>::is_ring() const { return geos_ring_->isRing(); }
+
+// Python: shapely/geometry/polygon.py::is_ccw:L97
+template <typename T>
+bool LinearRing<T>::is_ccw() const {
+    if (rows_ < 3 || !geos_ring_) return false;
+    return geos::algorithm::Orientation::isCCW(geos_ring_->getCoordinatesRO());
+}
+
+// area:L434, length:L447
+template <typename T> double LinearRing<T>::area() const { return 0.0; }
+template <typename T> double LinearRing<T>::length() const { return geos_ring_->getLength(); }
+// bounds:L470
+template <typename T> std::vector<double> LinearRing<T>::bounds() const { return detail::geos_bounds(geos_ring_.get()); }
+
+// Python: shapely/geometry/base.py accessors L365-L708
+// -- Accessors ---------------------------------------------------------------
+
+// wkt:L369, wkb_hex:L379, type:L365, geom_type:L426, has_z:L708
+template <typename T> std::string LinearRing<T>::wkt() const { return detail::geos_to_wkt(geos_ring_.get()); }
+template <typename T> std::string LinearRing<T>::wkb_hex() const { return detail::geos_to_wkb_hex(geos_ring_.get()); }
+template <typename T> std::string LinearRing<T>::type() const { return "LinearRing"; }
+template <typename T> std::string LinearRing<T>::geom_type() const { return detail::geos_geom_type(geos_ring_.get()); }
+template <typename T> bool        LinearRing<T>::has_z() const { return detail::geos_has_z(geos_ring_.get()); }
+
+// Python: shapely/geometry/base.py::centroid:L478, normalize:L663
+// -- centroid / normalize ----------------------------------------------------
+
+template <typename T>
+Point<double> LinearRing<T>::centroid() const {
+    auto c = geos_ring_->getCentroid();
+    if (!c) return Point<double>(0, 0);
+    auto* coord = c->getCoordinate();
+    return Point<double>(coord->x, coord->y);
+}
+
+template <typename T>
+void LinearRing<T>::normalize() { geos_ring_->normalize(); }
+
+// ============================================================================
+// Polygon implementation
+// ============================================================================
+
+// Python: shapely/geometry/polygon.py::__init__:L238
 // -- Constructors ------------------------------------------------------------
 
 template <typename T>
@@ -182,6 +356,7 @@ Polygon<T>::Polygon(const T* coords, size_t rows, size_t cols)
     geos_polygon_ = factory_->createPolygon(std::move(ring));
 }
 
+// Python: shapely/geometry/polygon.py::coords:L332
 // -- coords ------------------------------------------------------------------
 
 template <typename T>
@@ -191,11 +366,11 @@ std::vector<std::tuple<T, T>> Polygon<T>::coords() const {
     return r;
 }
 
+// Python: shapely/geometry/polygon.py::exterior:L270, interiors:L284
 // -- exterior / interiors ----------------------------------------------------
 
 template <typename T>
 LinearRing<double> Polygon<T>::exterior() const {
-    // Will be defined after linearring.h is included
     auto* er = geos_polygon_->getExteriorRing();
     if (!er) return LinearRing<double>();
     auto* cs = er->getCoordinatesRO();
@@ -222,11 +397,13 @@ std::vector<LinearRing<double>> Polygon<T>::interiors() const {
     return result;
 }
 
+// Python: shapely/geometry/base.py::area:L434
 // -- Area --------------------------------------------------------------------
 
 template <typename T>
 double Polygon<T>::area() const { return geos_polygon_->getArea(); }
 
+// Python: shapely/geometry/base.py::distance:L438
 // -- distance ----------------------------------------------------------------
 
 template <typename T>
@@ -245,6 +422,7 @@ double Polygon<T>::distance(const Point<U>& o) const {
     return op.distance();
 }
 
+// Python: shapely/geometry/base.py predicates L753-L813
 // -- Predicates (macro) ------------------------------------------------------
 
 #define POLY_PRED_IMPL(METHOD, GEOS_FN) \
@@ -252,6 +430,8 @@ template <typename T> template <typename U> bool Polygon<T>::METHOD(const Point<
 template <typename T> template <typename U> bool Polygon<T>::METHOD(const LineString<U>& o) const { return detail::GEOS_FN(geos_polygon_.get(), o.geos_linestring_.get()); } \
 template <typename T> template <typename U> bool Polygon<T>::METHOD(const Polygon<U>& o) const { return detail::GEOS_FN(geos_polygon_.get(), o.geos_polygon_.get()); }
 
+// contains:L766, within:L813, crosses:L770, disjoint:L774, overlaps:L805,
+// touches:L809, covers:L758, covered_by:L762, equals:L778
 POLY_PRED_IMPL(contains,    geos_contains)
 POLY_PRED_IMPL(within,      geos_within)
 POLY_PRED_IMPL(crosses,     geos_crosses)
@@ -263,16 +443,19 @@ POLY_PRED_IMPL(covered_by,  geos_covered_by)
 POLY_PRED_IMPL(equals,      geos_equals)
 #undef POLY_PRED_IMPL
 
+// Python: shapely/geometry/base.py::equals_exact:L817
 // equals_exact
 template <typename T> template <typename U> bool Polygon<T>::equals_exact(const Point<U>& o, double tol) const { return detail::geos_equals_exact(geos_polygon_.get(), o.geos_point_.get(), tol); }
 template <typename T> template <typename U> bool Polygon<T>::equals_exact(const LineString<U>& o, double tol) const { return detail::geos_equals_exact(geos_polygon_.get(), o.geos_linestring_.get(), tol); }
 template <typename T> template <typename U> bool Polygon<T>::equals_exact(const Polygon<U>& o, double tol) const { return detail::geos_equals_exact(geos_polygon_.get(), o.geos_polygon_.get(), tol); }
 
+// Python: shapely/geometry/base.py::intersects:L801
 // intersects
 template <typename T> bool Polygon<T>::intersects(const Polygon& o) const { return geos_polygon_->intersects(o.geos_polygon_.get()); }
 template <typename T> template <typename U> bool Polygon<T>::intersects(const LineString<U>& o) const { return geos_polygon_->intersects(o.geos_linestring_.get()); }
 template <typename T> template <typename U> bool Polygon<T>::intersects(const Point<U>& o) const { return geos_polygon_->intersects(o.geos_point_.get()); }
 
+// Python: shapely/geometry/base.py::relate:L753, relate_pattern:L890
 // -- relate / relate_pattern ------------------------------------------------
 
 #define POLY_RELATE_IMPL \
@@ -285,28 +468,34 @@ template <typename T> template <typename U> bool Polygon<T>::relate_pattern(cons
 POLY_RELATE_IMPL
 #undef POLY_RELATE_IMPL
 
+// Python: shapely/geometry/base.py::hausdorff_distance:L442
 // -- hausdorff_distance -----------------------------------------------------
 
 template <typename T> template <typename U> double Polygon<T>::hausdorff_distance(const Point<U>& o) const { return detail::geos_hausdorff_distance(geos_polygon_.get(), o.geos_point_.get()); }
 template <typename T> template <typename U> double Polygon<T>::hausdorff_distance(const LineString<U>& o) const { return detail::geos_hausdorff_distance(geos_polygon_.get(), o.geos_linestring_.get()); }
 template <typename T> template <typename U> double Polygon<T>::hausdorff_distance(const Polygon<U>& o) const { return detail::geos_hausdorff_distance(geos_polygon_.get(), o.geos_polygon_.get()); }
 
+// Python: shapely/geometry/base.py accessors L365-L708
 // -- Accessors ---------------------------------------------------------------
 
+// wkt:L369, wkb_hex:L379, type:L365, geom_type:L426, has_z:L708
 template <typename T> std::string Polygon<T>::wkt() const { return detail::geos_to_wkt(geos_polygon_.get()); }
 template <typename T> std::string Polygon<T>::wkb_hex() const { return detail::geos_to_wkb_hex(geos_polygon_.get()); }
 template <typename T> std::string Polygon<T>::type() const { return "Polygon"; }
 template <typename T> std::string Polygon<T>::geom_type() const { return detail::geos_geom_type(geos_polygon_.get()); }
 template <typename T> bool        Polygon<T>::has_z() const { return detail::geos_has_z(geos_polygon_.get()); }
 
+// Python: shapely/geometry/base.py properties L714-L447
 // -- Properties --------------------------------------------------------------
 
+// is_empty:L714, is_simple:L739, is_valid:L745, length:L447, bounds:L470
 template <typename T> bool   Polygon<T>::is_empty() const { return detail::geos_is_empty(geos_polygon_.get()); }
 template <typename T> bool   Polygon<T>::is_simple() const { return detail::geos_is_simple(geos_polygon_.get()); }
 template <typename T> bool   Polygon<T>::is_valid() const { return geos_polygon_->isEmpty() ? false : geos_polygon_->isValid(); }
 template <typename T> double Polygon<T>::length() const { return geos_polygon_->getLength(); }
 template <typename T> std::vector<double> Polygon<T>::bounds() const { return detail::geos_bounds(geos_polygon_.get()); }
 
+// Python: shapely/geometry/base.py::intersection:L691
 // -- intersection ------------------------------------------------------------
 
 template <typename T>
@@ -331,6 +520,7 @@ Polygon<double> Polygon<T>::intersection(const Polygon<double>& other) const {
     return Polygon<double>();
 }
 
+// Python: shapely/geometry/base.py::centroid:L478
 // -- centroid ----------------------------------------------------------------
 
 template <typename T>
@@ -341,6 +531,7 @@ Point<double> Polygon<T>::centroid() const {
     return Point<double>(coord->x, coord->y);
 }
 
+// Python: shapely/geometry/base.py::buffer:L541
 // -- buffer ------------------------------------------------------------------
 
 template <typename T>
@@ -364,6 +555,7 @@ Polygon<double> Polygon<T>::buffer(double distance) const {
     return Polygon<double>(c.data(), n, 2);
 }
 
+// Python: shapely/geometry/base.py::normalize:L663
 // -- normalize ---------------------------------------------------------------
 
 template <typename T>

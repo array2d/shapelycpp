@@ -1,4 +1,5 @@
 // Python Source: shapely/geometry/linestring.py
+// Line Range: L19-L180 (class LineString + LineStringAdapter)
 // Alignment: strict
 // EXEMPTION: cpp_template_optimization
 // Reason: C++ template for float32/float64 coordinate support.
@@ -141,7 +142,7 @@ private:
 
 #include "shapely/geometry/point.h"
 #include "shapely/geometry/polygon.h"
-#include "shapely/detail/geos_utils.h"
+#include "shapely/geometry/base.h"
 
 #include <geos/geom/Point.h>
 #include <geos/geom/Polygon.h>
@@ -155,6 +156,7 @@ private:
 namespace shapely {
 namespace geometry {
 
+// Python: shapely/geometry/linestring.py::__init__:L27
 // -- Constructor -------------------------------------------------------------
 
 template <typename T>
@@ -171,6 +173,7 @@ LineString<T>::LineString(const T* coords, size_t rows, size_t cols)
     geos_linestring_ = factory_->createLineString(std::move(cs));
 }
 
+// Python: shapely/geometry/linestring.py::_get_coords:L115, xy:L134
 // -- coords, xy -------------------------------------------------------------
 
 template <typename T>
@@ -187,6 +190,7 @@ std::tuple<std::vector<T>, std::vector<T>> LineString<T>::xy() const {
     return {xs, ys};
 }
 
+// Python: shapely/geometry/base.py::distance:L438
 // -- distance ----------------------------------------------------------------
 
 template <typename T>
@@ -205,6 +209,7 @@ double LineString<T>::distance(const Point<U>& o) const {
     return op.distance();
 }
 
+// Python: shapely/geometry/base.py predicates L753-L813
 // -- Predicates (macro) ------------------------------------------------------
 
 #define LS_PRED_IMPL(METHOD, GEOS_FN) \
@@ -215,6 +220,8 @@ bool LineString<T>::METHOD(const LineString<U>& o) const { return detail::GEOS_F
 template <typename T> template <typename U> \
 bool LineString<T>::METHOD(const Polygon<U>& o) const { return detail::GEOS_FN(geos_linestring_.get(), o.geos_polygon_.get()); }
 
+// contains:L766, within:L813, crosses:L770, disjoint:L774, overlaps:L805,
+// touches:L809, covers:L758, covered_by:L762, equals:L778
 LS_PRED_IMPL(contains,    geos_contains)
 LS_PRED_IMPL(within,      geos_within)
 LS_PRED_IMPL(crosses,     geos_crosses)
@@ -226,16 +233,19 @@ LS_PRED_IMPL(covered_by,  geos_covered_by)
 LS_PRED_IMPL(equals,      geos_equals)
 #undef LS_PRED_IMPL
 
+// Python: shapely/geometry/base.py::equals_exact:L817
 // equals_exact
 template <typename T> template <typename U> bool LineString<T>::equals_exact(const Point<U>& o, double tol) const { return detail::geos_equals_exact(geos_linestring_.get(), o.geos_point_.get(), tol); }
 template <typename T> template <typename U> bool LineString<T>::equals_exact(const LineString<U>& o, double tol) const { return detail::geos_equals_exact(geos_linestring_.get(), o.geos_linestring_.get(), tol); }
 template <typename T> template <typename U> bool LineString<T>::equals_exact(const Polygon<U>& o, double tol) const { return detail::geos_equals_exact(geos_linestring_.get(), o.geos_polygon_.get(), tol); }
 
+// Python: shapely/geometry/base.py::intersects:L801
 // intersects
 template <typename T> bool LineString<T>::intersects(const LineString& o) const { return geos_linestring_->intersects(o.geos_linestring_.get()); }
 template <typename T> template <typename U> bool LineString<T>::intersects(const Point<U>& o) const { return geos_linestring_->intersects(o.geos_point_.get()); }
 template <typename T> template <typename U> bool LineString<T>::intersects(const Polygon<U>& o) const { return geos_linestring_->intersects(o.geos_polygon_.get()); }
 
+// Python: shapely/geometry/base.py::relate:L753, relate_pattern:L890
 // -- relate / relate_pattern ------------------------------------------------
 
 #define LS_RELATE_IMPL \
@@ -248,22 +258,27 @@ template <typename T> template <typename U> bool LineString<T>::relate_pattern(c
 LS_RELATE_IMPL
 #undef LS_RELATE_IMPL
 
+// Python: shapely/geometry/base.py::hausdorff_distance:L442
 // -- hausdorff_distance -----------------------------------------------------
 
 template <typename T> template <typename U> double LineString<T>::hausdorff_distance(const Point<U>& o) const { return detail::geos_hausdorff_distance(geos_linestring_.get(), o.geos_point_.get()); }
 template <typename T> template <typename U> double LineString<T>::hausdorff_distance(const LineString<U>& o) const { return detail::geos_hausdorff_distance(geos_linestring_.get(), o.geos_linestring_.get()); }
 template <typename T> template <typename U> double LineString<T>::hausdorff_distance(const Polygon<U>& o) const { return detail::geos_hausdorff_distance(geos_linestring_.get(), o.geos_polygon_.get()); }
 
+// Python: shapely/geometry/base.py accessors L365-L447
 // -- Accessors ---------------------------------------------------------------
 
+// wkt:L369, wkb_hex:L379, type:L365, geom_type:L426, has_z:L708
 template <typename T> std::string LineString<T>::wkt() const { return detail::geos_to_wkt(geos_linestring_.get()); }
 template <typename T> std::string LineString<T>::wkb_hex() const { return detail::geos_to_wkb_hex(geos_linestring_.get()); }
 template <typename T> std::string LineString<T>::type() const { return "LineString"; }
 template <typename T> std::string LineString<T>::geom_type() const { return detail::geos_geom_type(geos_linestring_.get()); }
 template <typename T> bool        LineString<T>::has_z() const { return detail::geos_has_z(geos_linestring_.get()); }
 
+// Python: shapely/geometry/base.py properties L714-L447
 // -- Properties --------------------------------------------------------------
 
+// is_empty:L714, is_simple:L739, is_valid:L745, is_closed:L724, is_ring:L719
 template <typename T> bool        LineString<T>::is_empty() const { return detail::geos_is_empty(geos_linestring_.get()); }
 template <typename T> bool        LineString<T>::is_simple() const { return detail::geos_is_simple(geos_linestring_.get()); }
 template <typename T> bool        LineString<T>::is_valid() const { return detail::geos_is_valid(geos_linestring_.get()); }
@@ -273,14 +288,17 @@ template <typename T> double      LineString<T>::area() const { return 0.0; }
 template <typename T> double      LineString<T>::length() const { return geos_linestring_->getLength(); }
 template <typename T> std::vector<double> LineString<T>::bounds() const { return detail::geos_bounds(geos_linestring_.get()); }
 
+// Python: shapely/geometry/base.py L900-L915, L478, L541, L663
 // -- project / interpolate / centroid / buffer / normalize ------------------
 
+// Python: base.py::project:L900
 template <typename T> template <typename U>
 double LineString<T>::project(const Point<U>& o) const {
     geos::linearref::LengthIndexedLine lil(geos_linestring_.get());
     return lil.project(geos::geom::Coordinate(static_cast<double>(o.x), static_cast<double>(o.y)));
 }
 
+// Python: base.py::interpolate:L915
 template <typename T>
 Point<double> LineString<T>::interpolate(double distance) const {
     geos::linearref::LengthIndexedLine lil(geos_linestring_.get());
@@ -288,6 +306,7 @@ Point<double> LineString<T>::interpolate(double distance) const {
     return Point<double>(c.x, c.y);
 }
 
+// Python: base.py::centroid:L478
 template <typename T>
 Point<double> LineString<T>::centroid() const {
     auto c = geos_linestring_->getCentroid();
@@ -296,6 +315,7 @@ Point<double> LineString<T>::centroid() const {
     return Point<double>(coord->x, coord->y);
 }
 
+// Python: base.py::buffer:L541
 template <typename T>
 Polygon<double> LineString<T>::buffer(double distance) const {
     if (!geos_linestring_ || geos_linestring_->isEmpty()) return Polygon<double>();
@@ -316,6 +336,7 @@ Polygon<double> LineString<T>::buffer(double distance) const {
     return Polygon<double>(c.data(), n, 2);
 }
 
+// Python: base.py::normalize:L663
 template <typename T>
 void LineString<T>::normalize() { geos_linestring_->normalize(); }
 
