@@ -183,8 +183,23 @@ public:
 
     // -- Topology --
     Polygon<double> intersection(const Polygon<double>& other) const;
+    Polygon<double> difference(const Polygon<double>& other) const;
+    Polygon<double> union_op(const Polygon<double>& other) const;
+    Polygon<double> sym_difference(const Polygon<double>& other) const;
+    Polygon<double> simplify(double tolerance) const;
+    Polygon<double> convex_hull() const;
+    Polygon<double> boundary() const;
+    Polygon<double> envelope() const;
+    Point<double> representative_point() const;
     Point<double> centroid() const;
     Polygon<double> buffer(double distance) const;
+
+    // -- Static-like factory (Python: from_bounds) --
+    static Polygon<double> from_bounds(double minx, double miny, double maxx, double maxy);
+
+    // -- xy (Python) --
+    std::tuple<std::vector<double>, std::vector<double>> xy() const;
+
     void normalize();
 
 private:
@@ -553,6 +568,119 @@ Polygon<double> Polygon<T>::buffer(double distance) const {
     std::vector<double> c(n*2);
     for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
     return Polygon<double>(c.data(), n, 2);
+}
+
+// Python: shapely/geometry/base.py::difference:L553, sym_difference:L697
+// -- difference / union / sym_difference -------------------------------------
+
+#define POLY_CONSTRUCT(OP, GEOS_FN) \
+template <typename T> \
+Polygon<double> Polygon<T>::OP(const Polygon<double>& o) const { \
+    auto res = detail::GEOS_FN(geos_polygon_.get(), o.geos_polygon_.get()); \
+    if (!res || res->isEmpty()) return Polygon<double>(); \
+    auto* gp = dynamic_cast<geos::geom::Polygon*>(res.get()); \
+    if (!gp) return Polygon<double>(); \
+    auto* cs = gp->getExteriorRing()->getCoordinatesRO(); \
+    if (!cs || cs->isEmpty()) return Polygon<double>(); \
+    size_t n = cs->getSize(); \
+    std::vector<double> c(n*2); \
+    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; } \
+    return Polygon<double>(c.data(), n, 2); \
+}
+POLY_CONSTRUCT(difference,       geos_difference)
+POLY_CONSTRUCT(union_op,         geos_union)
+POLY_CONSTRUCT(sym_difference,   geos_sym_difference)
+#undef POLY_CONSTRUCT
+
+// Python: shapely/geometry/base.py::simplify:L469
+template <typename T>
+Polygon<double> Polygon<T>::simplify(double tol) const {
+    auto res = detail::geos_simplify(geos_polygon_.get(), tol);
+    if (!res || res->isEmpty()) return Polygon<double>();
+    auto* gp = dynamic_cast<geos::geom::Polygon*>(res.get());
+    if (!gp) return Polygon<double>();
+    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
+    if (!cs || cs->isEmpty()) return Polygon<double>();
+    size_t n = cs->getSize();
+    std::vector<double> c(n*2);
+    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
+    return Polygon<double>(c.data(), n, 2);
+}
+
+// Python: shapely/geometry/base.py::convex_hull:L567
+template <typename T>
+Polygon<double> Polygon<T>::convex_hull() const {
+    auto res = detail::geos_convex_hull(geos_polygon_.get());
+    if (!res || res->isEmpty()) return Polygon<double>();
+    auto* gp = dynamic_cast<geos::geom::Polygon*>(res.get());
+    if (!gp) return Polygon<double>();
+    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
+    if (!cs || cs->isEmpty()) return Polygon<double>();
+    size_t n = cs->getSize();
+    std::vector<double> c(n*2);
+    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
+    return Polygon<double>(c.data(), n, 2);
+}
+
+// Python: shapely/geometry/base.py::boundary:L457
+template <typename T>
+Polygon<double> Polygon<T>::boundary() const {
+    auto res = detail::geos_boundary(geos_polygon_.get());
+    if (!res || res->isEmpty()) return Polygon<double>();
+    auto* ls = dynamic_cast<geos::geom::LineString*>(res.get());
+    if (ls) {
+        auto* cs = ls->getCoordinatesRO(); size_t n = cs->getSize();
+        std::vector<double> c(n*2);
+        for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
+        return Polygon<double>(c.data(), n, 2);
+    }
+    return Polygon<double>();
+}
+
+// Python: shapely/geometry/base.py::envelope:L742
+template <typename T>
+Polygon<double> Polygon<T>::envelope() const {
+    auto res = detail::geos_envelope(geos_polygon_.get());
+    if (!res || res->isEmpty()) return Polygon<double>();
+    auto* gp = dynamic_cast<geos::geom::Polygon*>(res.get());
+    if (!gp) return Polygon<double>();
+    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
+    if (!cs || cs->isEmpty()) return Polygon<double>();
+    size_t n = cs->getSize();
+    std::vector<double> c(n*2);
+    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
+    return Polygon<double>(c.data(), n, 2);
+}
+
+// Python: shapely/geometry/base.py::representative_point:L877
+template <typename T>
+Point<double> Polygon<T>::representative_point() const {
+    auto res = detail::geos_representative_point(geos_polygon_.get());
+    if (!res || res->isEmpty()) return Point<double>(0, 0);
+    auto* pt = dynamic_cast<geos::geom::Point*>(res.get());
+    if (!pt) return Point<double>(0, 0);
+    return Point<double>(pt->getX(), pt->getY());
+}
+
+// Python: shapely/geometry/polygon.py::from_bounds:L250
+template <typename T>
+Polygon<double> Polygon<T>::from_bounds(double minx, double miny, double maxx, double maxy) {
+    auto res = detail::geos_from_bounds(minx, miny, maxx, maxy);
+    auto* gp = dynamic_cast<geos::geom::Polygon*>(res.get());
+    if (!gp) return Polygon<double>();
+    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
+    if (!cs || cs->isEmpty()) return Polygon<double>();
+    size_t n = cs->getSize();
+    std::vector<double> c(n*2);
+    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
+    return Polygon<double>(c.data(), n, 2);
+}
+
+// Python: shapely/geometry/base.py::xy
+template <typename T>
+std::tuple<std::vector<double>, std::vector<double>> Polygon<T>::xy() const {
+    auto ext = exterior();
+    return ext.xy();
 }
 
 // Python: shapely/geometry/base.py::normalize:L663

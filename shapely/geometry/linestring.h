@@ -121,6 +121,23 @@ public:
     Polygon<double> buffer(double distance) const;
     void normalize();
 
+    // -- Constructive operations (Python: difference, union, intersection, sym_difference) --
+    std::string difference(const LineString& other) const;
+    template <typename U> std::string difference(const Point<U>& other) const;
+    template <typename U> std::string difference(const Polygon<U>& other) const;
+    std::string intersection(const LineString& other) const;
+    template <typename U> std::string intersection(const Point<U>& other) const;
+    template <typename U> std::string intersection(const Polygon<U>& other) const;
+    std::string union_op(const LineString& other) const;
+    template <typename U> std::string union_op(const Point<U>& other) const;
+    template <typename U> std::string union_op(const Polygon<U>& other) const;
+    std::string sym_difference(const LineString& other) const;
+    template <typename U> std::string sym_difference(const Point<U>& other) const;
+    template <typename U> std::string sym_difference(const Polygon<U>& other) const;
+    std::string simplify(double tolerance) const;
+    std::string parallel_offset(double distance, int quad_segs = 16) const;
+    Polygon<double> convex_hull() const;
+
 private:
     template <typename U> friend class Polygon;
     template <typename U> friend class Point;
@@ -329,6 +346,57 @@ Polygon<double> LineString<T>::buffer(double distance) const {
     auto* gp = dynamic_cast<const geos::geom::Polygon*>(poly);
     if (!gp) return Polygon<double>();
     auto* cs = gp->getExteriorRing()->getCoordinatesRO();
+    if (!cs || cs->isEmpty()) return Polygon<double>();
+    size_t n = cs->getSize();
+    std::vector<double> c(n*2);
+    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
+    return Polygon<double>(c.data(), n, 2);
+}
+
+// Python: shapely/geometry/base.py L553-L703
+// -- Constructive operations -------------------------------------------------
+
+#define LS_CONSTRUCT(OP, GEOS_FN) \
+template <typename T> std::string LineString<T>::OP(const LineString& o) const { \
+    auto res = detail::GEOS_FN(geos_linestring_.get(), o.geos_linestring_.get()); \
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY"; \
+} \
+template <typename T> template <typename U> std::string LineString<T>::OP(const Point<U>& o) const { \
+    auto res = detail::GEOS_FN(geos_linestring_.get(), o.geos_point_.get()); \
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY"; \
+} \
+template <typename T> template <typename U> std::string LineString<T>::OP(const Polygon<U>& o) const { \
+    auto res = detail::GEOS_FN(geos_linestring_.get(), o.geos_polygon_.get()); \
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY"; \
+}
+LS_CONSTRUCT(difference,       geos_difference)
+LS_CONSTRUCT(intersection,     geos_intersection)
+LS_CONSTRUCT(union_op,         geos_union)
+LS_CONSTRUCT(sym_difference,   geos_sym_difference)
+#undef LS_CONSTRUCT
+
+// Python: base.py::simplify:L469
+template <typename T>
+std::string LineString<T>::simplify(double tol) const {
+    auto res = detail::geos_simplify(geos_linestring_.get(), tol);
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+
+// Python: linestring.py::parallel_offset:L152
+template <typename T>
+std::string LineString<T>::parallel_offset(double distance, int quad_segs) const {
+    auto res = detail::geos_parallel_offset(geos_linestring_.get(), distance, quad_segs);
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+
+// Python: base.py::convex_hull:L567
+template <typename T>
+Polygon<double> LineString<T>::convex_hull() const {
+    auto res = detail::geos_convex_hull(geos_linestring_.get());
+    if (!res || res->isEmpty()) return Polygon<double>();
+    auto* poly = dynamic_cast<geos::geom::Polygon*>(res.get());
+    if (!poly) return Polygon<double>();
+    auto* cs = poly->getExteriorRing()->getCoordinatesRO();
     if (!cs || cs->isEmpty()) return Polygon<double>();
     size_t n = cs->getSize();
     std::vector<double> c(n*2);

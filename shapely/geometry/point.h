@@ -107,6 +107,26 @@ public:
     double length() const;
     std::vector<double> bounds() const;
 
+    // -- Constructive operations (Python: difference, union, intersection, sym_difference, simplify) --
+    Point<double> difference(const Point& other) const;
+    template <typename U> std::string difference(const LineString<U>& other) const;
+    template <typename U> std::string difference(const Polygon<U>& other) const;
+    Point<double> intersection(const Point& other) const;
+    template <typename U> std::string intersection(const LineString<U>& other) const;
+    template <typename U> std::string intersection(const Polygon<U>& other) const;
+    Point<double> union_op(const Point& other) const;
+    template <typename U> std::string union_op(const LineString<U>& other) const;
+    template <typename U> std::string union_op(const Polygon<U>& other) const;
+    Point<double> sym_difference(const Point& other) const;
+    template <typename U> std::string sym_difference(const LineString<U>& other) const;
+    template <typename U> std::string sym_difference(const Polygon<U>& other) const;
+    Point<double> simplify(double tolerance) const;
+
+    // -- Topology (Python: convex_hull, boundary, envelope, representative_point) --
+    Point<double> convex_hull() const;
+    Point<double> envelope() const;
+    Point<double> representative_point() const;
+
     // -- Centroid, normalize --
     Point<double> centroid() const;
     void normalize();
@@ -309,6 +329,128 @@ template <typename T> double      Point<T>::area() const { return 0.0; }
 template <typename T> double      Point<T>::length() const { return 0.0; }
 // Python: base.py::bounds:L470
 template <typename T> std::vector<double> Point<T>::bounds() const { return detail::geos_bounds(geos_point_.get()); }
+
+// Python: shapely/geometry/base.py L553-L703
+// -- Constructive operations (difference, union, intersection, sym_difference) --
+
+template <typename T>
+Point<double> Point<T>::difference(const Point& o) const {
+    auto res = detail::geos_difference(geos_point_.get(), o.geos_point_.get());
+    if (!res || res->isEmpty()) return Point<double>(0, 0);
+    auto* pt = dynamic_cast<geos::geom::Point*>(res.get());
+    if (!pt) return Point<double>(0, 0);
+    return Point<double>(pt->getX(), pt->getY());
+}
+template <typename T> template <typename U>
+std::string Point<T>::difference(const LineString<U>& o) const {
+    auto res = detail::geos_difference(geos_point_.get(), o.geos_linestring_.get());
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+template <typename T> template <typename U>
+std::string Point<T>::difference(const Polygon<U>& o) const {
+    auto res = detail::geos_difference(geos_point_.get(), o.geos_polygon_.get());
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+
+template <typename T>
+Point<double> Point<T>::intersection(const Point& o) const {
+    auto res = detail::geos_intersection(geos_point_.get(), o.geos_point_.get());
+    if (!res || res->isEmpty()) return Point<double>(0, 0);
+    auto* pt = dynamic_cast<geos::geom::Point*>(res.get());
+    if (!pt) return Point<double>(0, 0);
+    return Point<double>(pt->getX(), pt->getY());
+}
+template <typename T> template <typename U>
+std::string Point<T>::intersection(const LineString<U>& o) const {
+    auto res = detail::geos_intersection(geos_point_.get(), o.geos_linestring_.get());
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+template <typename T> template <typename U>
+std::string Point<T>::intersection(const Polygon<U>& o) const {
+    auto res = detail::geos_intersection(geos_point_.get(), o.geos_polygon_.get());
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+
+template <typename T>
+Point<double> Point<T>::union_op(const Point& o) const {
+    auto res = detail::geos_union(geos_point_.get(), o.geos_point_.get());
+    if (!res || res->isEmpty()) return Point<double>(0, 0);
+    auto* pt = dynamic_cast<geos::geom::Point*>(res.get());
+    if (!pt) return Point<double>(0, 0);
+    return Point<double>(pt->getX(), pt->getY());
+}
+template <typename T> template <typename U>
+std::string Point<T>::union_op(const LineString<U>& o) const {
+    auto res = detail::geos_union(geos_point_.get(), o.geos_linestring_.get());
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+template <typename T> template <typename U>
+std::string Point<T>::union_op(const Polygon<U>& o) const {
+    auto res = detail::geos_union(geos_point_.get(), o.geos_polygon_.get());
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+
+template <typename T>
+Point<double> Point<T>::sym_difference(const Point& o) const {
+    auto res = detail::geos_sym_difference(geos_point_.get(), o.geos_point_.get());
+    if (!res || res->isEmpty()) return Point<double>(0, 0);
+    auto* mpt = dynamic_cast<geos::geom::MultiPoint*>(res.get());
+    if (mpt && mpt->getNumGeometries() > 0) {
+        auto* pt = dynamic_cast<const geos::geom::Point*>(mpt->getGeometryN(0));
+        if (pt) return Point<double>(pt->getX(), pt->getY());
+    }
+    auto* pt = dynamic_cast<geos::geom::Point*>(res.get());
+    if (pt) return Point<double>(pt->getX(), pt->getY());
+    return Point<double>(0, 0);
+}
+template <typename T> template <typename U>
+std::string Point<T>::sym_difference(const LineString<U>& o) const {
+    auto res = detail::geos_sym_difference(geos_point_.get(), o.geos_linestring_.get());
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+template <typename T> template <typename U>
+std::string Point<T>::sym_difference(const Polygon<U>& o) const {
+    auto res = detail::geos_sym_difference(geos_point_.get(), o.geos_polygon_.get());
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+
+// Python: shapely/geometry/base.py::simplify:L469
+template <typename T>
+Point<double> Point<T>::simplify(double tol) const {
+    auto res = detail::geos_simplify(geos_point_.get(), tol);
+    if (!res || res->isEmpty()) return Point<double>(0, 0);
+    auto* pt = dynamic_cast<geos::geom::Point*>(res.get());
+    if (!pt) return Point<double>(0, 0);
+    return Point<double>(pt->getX(), pt->getY());
+}
+
+// Python: shapely/geometry/base.py::convex_hull:L567, boundary:L457, envelope:L742
+template <typename T>
+Point<double> Point<T>::convex_hull() const {
+    auto res = detail::geos_convex_hull(geos_point_.get());
+    if (!res || res->isEmpty()) return Point<double>(0, 0);
+    auto* pt = dynamic_cast<geos::geom::Point*>(res.get());
+    if (!pt) return Point<double>(0, 0);
+    return Point<double>(pt->getX(), pt->getY());
+}
+
+template <typename T>
+Point<double> Point<T>::envelope() const {
+    auto res = detail::geos_envelope(geos_point_.get());
+    if (!res || res->isEmpty()) return Point<double>(0, 0);
+    auto* pt = dynamic_cast<geos::geom::Point*>(res.get());
+    if (!pt) return Point<double>(0, 0);
+    return Point<double>(pt->getX(), pt->getY());
+}
+
+template <typename T>
+Point<double> Point<T>::representative_point() const {
+    auto res = detail::geos_representative_point(geos_point_.get());
+    if (!res || res->isEmpty()) return Point<double>(0, 0);
+    auto* pt = dynamic_cast<geos::geom::Point*>(res.get());
+    if (!pt) return Point<double>(0, 0);
+    return Point<double>(pt->getX(), pt->getY());
+}
 
 // Python: shapely/geometry/base.py::centroid:L478
 // -- Centroid ----------------------------------------------------------------

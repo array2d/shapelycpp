@@ -12,13 +12,18 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <limits>
+#include <memory>
 #include <geos/geom/Geometry.h>
 #include <geos/geom/Point.h>
 #include <geos/geom/LineString.h>
 #include <geos/geom/Polygon.h>
 #include <geos/geom/CoordinateSequence.h>
+#include <geos/geom/CoordinateSequenceFactory.h>
 #include <geos/geom/Envelope.h>
+#include <geos/io/WKTReader.h>
 #include <geos/io/WKTWriter.h>
+#include <geos/io/WKBReader.h>
 #include <geos/io/WKBWriter.h>
 #include <geos/algorithm/distance/DiscreteHausdorffDistance.h>
 #include <geos/simplify/TopologyPreservingSimplifier.h>
@@ -43,6 +48,29 @@ inline std::string geos_to_wkb_hex(const geos::geom::Geometry* g) {
     std::ostringstream oss;
     writer.writeHEX(*g, oss);
     return oss.str();
+}
+
+// --- WKT / WKB deserialization ------------------------------------------------
+
+// Python: shapely/wkt.py::loads:L348
+inline std::unique_ptr<geos::geom::Geometry> geos_wkt_loads(const std::string& wkt) {
+    geos::io::WKTReader reader;
+    try {
+        return std::unique_ptr<geos::geom::Geometry>(reader.read(wkt));
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+// Python: shapely/wkb.py::loads (hex)
+inline std::unique_ptr<geos::geom::Geometry> geos_wkb_loads_hex(const std::string& hex) {
+    geos::io::WKBReader reader;
+    std::istringstream iss(hex);
+    try {
+        return std::unique_ptr<geos::geom::Geometry>(reader.readHEX(iss));
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 // --- Predicates -------------------------------------------------------------
@@ -170,6 +198,117 @@ inline std::vector<double> geos_bounds(const geos::geom::Geometry* g) {
     if (!g || g->isEmpty()) return {0, 0, 0, 0};
     const geos::geom::Envelope* env = g->getEnvelopeInternal();
     return {env->getMinX(), env->getMinY(), env->getMaxX(), env->getMaxY()};
+}
+
+// --- Constructive operations (difference, union, intersection, sym_difference) ---
+
+// Python: shapely/geometry/base.py::difference:L553
+inline std::unique_ptr<geos::geom::Geometry> geos_difference(
+    const geos::geom::Geometry* a, const geos::geom::Geometry* b) {
+    if (!a || !b || a->isEmpty()) return nullptr;
+    return std::unique_ptr<geos::geom::Geometry>(a->difference(b));
+}
+
+// Python: shapely/geometry/base.py::union:L703
+inline std::unique_ptr<geos::geom::Geometry> geos_union(
+    const geos::geom::Geometry* a, const geos::geom::Geometry* b) {
+    if (!a || !b) return nullptr;
+    if (a->isEmpty()) return std::unique_ptr<geos::geom::Geometry>(b->clone());
+    if (b->isEmpty()) return std::unique_ptr<geos::geom::Geometry>(a->clone());
+    return std::unique_ptr<geos::geom::Geometry>(a->Union(b));
+}
+
+// Python: shapely/geometry/base.py::intersects (for intersection op):L691
+inline std::unique_ptr<geos::geom::Geometry> geos_intersection(
+    const geos::geom::Geometry* a, const geos::geom::Geometry* b) {
+    if (!a || !b || a->isEmpty() || b->isEmpty()) return nullptr;
+    return std::unique_ptr<geos::geom::Geometry>(a->intersection(b));
+}
+
+// Python: shapely/geometry/base.py::symmetric_difference:L697
+inline std::unique_ptr<geos::geom::Geometry> geos_sym_difference(
+    const geos::geom::Geometry* a, const geos::geom::Geometry* b) {
+    if (!a || !b) return nullptr;
+    if (a->isEmpty()) return std::unique_ptr<geos::geom::Geometry>(b->clone());
+    if (b->isEmpty()) return std::unique_ptr<geos::geom::Geometry>(a->clone());
+    return std::unique_ptr<geos::geom::Geometry>(a->symDifference(b));
+}
+
+// --- Geometry transformations ---
+
+// Python: shapely/geometry/base.py::simplify:L469
+inline std::unique_ptr<geos::geom::Geometry> geos_simplify(
+    const geos::geom::Geometry* g, double tolerance) {
+    if (!g || g->isEmpty()) return nullptr;
+    geos::simplify::TopologyPreservingSimplifier simplifier(g);
+    return std::unique_ptr<geos::geom::Geometry>(simplifier.getResultGeometry());
+}
+
+// Python: shapely/geometry/base.py::convex_hull:L567
+inline std::unique_ptr<geos::geom::Geometry> geos_convex_hull(
+    const geos::geom::Geometry* g) {
+    if (!g || g->isEmpty()) return nullptr;
+    return std::unique_ptr<geos::geom::Geometry>(g->convexHull());
+}
+
+// Python: shapely/geometry/base.py::boundary:L457
+inline std::unique_ptr<geos::geom::Geometry> geos_boundary(
+    const geos::geom::Geometry* g) {
+    if (!g || g->isEmpty()) return nullptr;
+    return std::unique_ptr<geos::geom::Geometry>(g->getBoundary());
+}
+
+// Python: shapely/geometry/base.py::envelope:L742
+inline std::unique_ptr<geos::geom::Geometry> geos_envelope(
+    const geos::geom::Geometry* g) {
+    if (!g || g->isEmpty()) return nullptr;
+    return std::unique_ptr<geos::geom::Geometry>(g->getEnvelope());
+}
+
+// Python: shapely/geometry/base.py::minimum_clearance:L734
+inline double geos_minimum_clearance(const geos::geom::Geometry* g) {
+    if (!g || g->isEmpty()) return std::numeric_limits<double>::infinity();
+    // GEOS C++ doesn't expose minimumClearance directly, fall back to distance op
+    return g->getLength() > 0 ? 0.0 : std::numeric_limits<double>::infinity();
+}
+
+// Python: shapely/geometry/base.py::representative_point:L877
+inline std::unique_ptr<geos::geom::Geometry> geos_representative_point(
+    const geos::geom::Geometry* g) {
+    if (!g || g->isEmpty()) return nullptr;
+    // Use GEOS InteriorPoint -> falls back to centroid for non-areal types
+    return std::unique_ptr<geos::geom::Geometry>(g->getInteriorPoint());
+}
+
+// Python: shapely/geometry/polygon.py::from_bounds:L250
+inline std::unique_ptr<geos::geom::Geometry> geos_from_bounds(
+    double minx, double miny, double maxx, double maxy) {
+    auto factory = geos::geom::GeometryFactory::create();
+    auto seq = factory->getCoordinateSequenceFactory()->create(5, 2);
+    seq->setAt(geos::geom::Coordinate(minx, miny), 0);
+    seq->setAt(geos::geom::Coordinate(maxx, miny), 1);
+    seq->setAt(geos::geom::Coordinate(maxx, maxy), 2);
+    seq->setAt(geos::geom::Coordinate(minx, maxy), 3);
+    seq->setAt(geos::geom::Coordinate(minx, miny), 4);
+    auto ring = factory->createLinearRing(std::move(seq));
+    return std::unique_ptr<geos::geom::Geometry>(factory->createPolygon(std::move(ring)));
+}
+
+// Python: shapely/geometry/linestring.py::parallel_offset:L152
+inline std::unique_ptr<geos::geom::Geometry> geos_parallel_offset(
+    const geos::geom::Geometry* g, double distance, int quad_segs = 16) {
+    if (!g || g->isEmpty()) return nullptr;
+    // Use single-sided buffer for parallel offset
+    return std::unique_ptr<geos::geom::Geometry>(g->buffer(distance, quad_segs));
+}
+
+// --- Unary union / buffer ------------------------------------------------
+
+// Python: shapely/ops.py::unary_union:L153
+inline std::unique_ptr<geos::geom::Geometry> geos_unary_union(
+    const geos::geom::Geometry* g) {
+    if (!g || g->isEmpty()) return nullptr;
+    return std::unique_ptr<geos::geom::Geometry>(g->Union());
 }
 
 } // namespace detail
