@@ -18,7 +18,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgeos-dev python3-pip
-          python3 -m pip install --break-system-packages shapely
+          python3 -m pip install shapely
 
       - name: Configure and build .deb
         run: |
@@ -38,7 +38,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgeos-dev python3-pip
-          python3 -m pip install --break-system-packages shapely
+          python3 -m pip install shapely
 
       - name: Build .deb
         run: |
