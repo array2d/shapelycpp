@@ -86,7 +86,7 @@ add_custom_target(deb
 )
 
 # ---- Tests (optional, requires pybind11 + GEOS) ------------------------------
-option(BUILD_TESTS "Build pybind11 test module" OFF)
+option(BUILD_TESTS "Build pybind11 test module" ON)
 if(BUILD_TESTS)
     add_subdirectory(tests)
 endif()
