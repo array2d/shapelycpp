@@ -15,6 +15,25 @@ We created `shapelycpp` to keep Shapely's familiar API while letting C++ break t
 
 `shapelycpp` is a **header-only C++ library** implementing shapely's core geometry API (`shapely.geometry.*`, `shapely.ops.*`) with pixel-level precision alignment. Template-based design supports both `float` and `double` coordinates. Powered by GEOS for robust computational geometry.
 
+## Precision Alignment
+
+### `double` (C++) ↔ Python shapely: Bit-identical
+
+When using `Point<double>`, `LineString<double>`, `Polygon<double>` (the default), all geometry operations produce **bit-identical** results to Python shapely. This is guaranteed because:
+
+- Both use the same GEOS engine (`geos::operation::distance::DistanceOp`, `Geometry::intersects()`, etc.).
+- Python shapely calls `GEOSDistance_r()` (C API), which internally invokes the same `DistanceOp::distance()` as the C++ `shapelycpp`.
+- `LinearRing` / `Polygon` / `LineString` constructors both populate `geos::geom::CoordinateSequence` via the same `Coordinate(x, y)` path.
+
+### `float` (C++) ↔ Python shapely: NOT bit-identical
+
+When using `Point<float>`, `LineString<float>`, `Polygon<float>`:
+
+- **Python shapely has no `float32` mode.** All coordinates are automatically promoted to Python `float` (C `double`).
+- The C++ `float` → `double` widening during `Coordinate` construction introduces precision loss (~7 significant digits for `float32` vs ~15 for `float64`).
+- Results may differ from Python shapely by up to `1e-5` in relative/absolute terms for `float32`.
+- Use `float` precision only when bit-identical alignment with Python shapely is NOT required (e.g., GPU-accelerated computation where `float32` throughput matters).
+
 ## Quick Start
 
 ### Dependencies
@@ -83,8 +102,9 @@ shapelycpp/
 │   └── main.cpp
 ├── tests/              # Python precision alignment tests
 │   ├── module.cpp      # pybind11 test module
-│   ├── test_geometry.py
-│   └── test_ops.py
+│   ├── conftest.py     # pytest fixtures (float64/float32 make, CppFactory)
+│   ├── utils.py        # coordinate generators & comparison helpers
+│   └── test_api.py     # unified precision alignment tests (float64/float32)
 ├── CMakeLists.txt      # build & .deb packaging
 └── README.md
 ```
