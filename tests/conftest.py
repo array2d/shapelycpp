@@ -62,16 +62,24 @@ def dtype(request):
 
 @pytest.fixture(params=[np.float64, np.float32], ids=["float64", "float32"])
 def make(cpp, request):
-    """Parametrized fixture providing float64/float32 geometry factories and classes."""
+    """Parametrized fixture providing float64/float32 geometry factories and classes.
+
+    All factories use the SAME Python name (e.g. cpp.point) — dtype is selected
+    by passing numpy arrays with the appropriate dtype.  pybind11 overload
+    resolution picks the matching C++ template instantiation."""
     if request.param == np.float64:
         return {
-            'point': cpp.point, 'linestring': cpp.linestring, 'polygon': cpp.polygon,
+            'point': lambda x, y: cpp.point(float(x), float(y)),
+            'linestring': lambda coords: cpp.linestring(np.array(coords, dtype=np.float64)),
+            'polygon': lambda coords: cpp.polygon(np.array(coords, dtype=np.float64)),
             'Point': cpp.Point, 'LineString': cpp.LineString, 'Polygon': cpp.Polygon,
             'dtype': np.float64,
         }
     else:
         return {
-            'point': cpp.point_f32, 'linestring': cpp.linestring_f32, 'polygon': cpp.polygon_f32,
+            'point': lambda x, y: cpp.point(np.array([x, y], dtype=np.float32)),
+            'linestring': lambda coords: cpp.linestring(np.array(coords, dtype=np.float32)),
+            'polygon': lambda coords: cpp.polygon(np.array(coords, dtype=np.float32)),
             'Point': cpp.PointF32, 'LineString': cpp.LineStringF32, 'Polygon': cpp.PolygonF32,
             'dtype': np.float32,
         }
@@ -82,16 +90,19 @@ class CppFactory:
     def __init__(self, cpp_mod):
         self.m = cpp_mod
     def point(self, x, y, dtype='double'):
-        if dtype == 'float32': return self.m.point_f32(float(x), float(y))
+        if dtype == 'float32':
+            return self.m.point(np.array([float(x), float(y)], dtype=np.float32))
         return self.m.point(float(x), float(y))
     def linestring(self, coords, dtype='double'):
-        if dtype == 'float32': return self.m.linestring_f32(coords)
-        return self.m.linestring(coords)
+        if dtype == 'float32':
+            return self.m.linestring(np.array(coords, dtype=np.float32))
+        return self.m.linestring(np.array(coords, dtype=np.float64))
     def polygon(self, coords, dtype='double'):
-        if dtype == 'float32': return self.m.polygon_f32(coords)
-        return self.m.polygon(coords)
+        if dtype == 'float32':
+            return self.m.polygon(np.array(coords, dtype=np.float32))
+        return self.m.polygon(np.array(coords, dtype=np.float64))
     def linearring(self, coords):
-        return self.m.linearring(coords)
+        return self.m.linearring(np.array(coords, dtype=np.float64))
 
 @pytest.fixture(scope='session')
 def C(cpp):

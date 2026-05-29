@@ -1,11 +1,11 @@
 // Pybind11 wrappers for shapelycpp geometry types.
 //
-// Thin layer: accept Python types (py::list, scalars) → construct C++ geometry
-// types → call native methods → wrap results back to Python.
+// Thin layer: accept Python types (py::array_t<T>, scalars) → construct C++
+// geometry types → call native methods → wrap results back to Python.
 //
-// Inspired by the numpypy/pycpp pattern. Each wrapper matches a shapely Python
-// API signature.  Cross-type operations are exposed as free functions because
-// pybind11 cannot bind template member functions with mixed template args.
+// All factories are overloaded by coordinate type — no _f32 suffixes.
+// linestring/polygon/linearring use py::array_t<T> so pybind11 distinguishes
+// by array dtype.  point has both scalar (x,y) and array ([x,y]) forms.
 
 #pragma once
 
@@ -24,26 +24,11 @@
 namespace py = pybind11;
 using namespace shapely::geometry;
 
+namespace shapely_py {
+
 // ============================================================================
 // Internal helpers
 // ============================================================================
-
-namespace shapely_py {
-
-/// Convert Python list of (x,y) tuples to a flat coordinate array.
-template <typename T>
-py::array_t<T> py_coords_to_array(const py::list& py_coords) {
-    py::ssize_t n = py::len(py_coords);
-    auto arr = py::array_t<T>({n, static_cast<py::ssize_t>(2)});
-    auto buf = arr.template request();
-    T* ptr = static_cast<T*>(buf.ptr);
-    for (py::ssize_t i = 0; i < n; ++i) {
-        auto t = py_coords[i].cast<py::tuple>();
-        ptr[i * 2] = t[0].cast<T>();
-        ptr[i * 2 + 1] = t[1].cast<T>();
-    }
-    return arr;
-}
 
 /// Copy native T* data to a Python numpy array.
 template <typename T>
@@ -54,85 +39,71 @@ py::array_t<T> native_to_array(const T* data, size_t rows, size_t cols) {
     return result;
 }
 
-} // namespace shapely_py
-
 // ============================================================================
-// Factory functions
+// Factory functions — all overloaded, no _f32 suffixes
 // ============================================================================
 
-namespace shapely_py {
-
+// -- Point: scalar (x,y) + array ([x,y]) forms --
 inline Point<double> point(double x, double y) { return Point<double>(x, y); }
-inline Point<float>  point_f32(float x, float y) { return Point<float>(x, y); }
+inline Point<float>  point(float x, float y)  { return Point<float>(x, y); }
 
-inline LineString<double> linestring(const py::list& coords) {
-    auto arr = py_coords_to_array<double>(coords);
+inline Point<double> point(const py::array_t<double>& arr) {
     auto buf = arr.request();
-    return LineString<double>(static_cast<const double*>(buf.ptr),
-                               buf.shape[0], buf.shape[1]);
+    const double* p = static_cast<const double*>(buf.ptr);
+    return Point<double>(buf.size > 0 ? p[0] : 0, buf.size > 1 ? p[1] : 0);
 }
-inline LineString<float> linestring_f32(const py::list& coords) {
-    auto arr = py_coords_to_array<float>(coords);
+inline Point<float> point(const py::array_t<float>& arr) {
     auto buf = arr.request();
-    return LineString<float>(static_cast<const float*>(buf.ptr),
-                              buf.shape[0], buf.shape[1]);
+    const float* p = static_cast<const float*>(buf.ptr);
+    return Point<float>(buf.size > 0 ? p[0] : 0, buf.size > 1 ? p[1] : 0);
 }
 
-inline Polygon<double> polygon(const py::list& coords) {
-    auto arr = py_coords_to_array<double>(coords);
+// -- LineString --
+inline LineString<double> linestring(const py::array_t<double>& arr) {
     auto buf = arr.request();
-    return Polygon<double>(static_cast<const double*>(buf.ptr),
-                            buf.shape[0], buf.shape[1]);
+    return LineString<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
-inline Polygon<float> polygon_f32(const py::list& coords) {
-    auto arr = py_coords_to_array<float>(coords);
+inline LineString<float> linestring(const py::array_t<float>& arr) {
     auto buf = arr.request();
-    return Polygon<float>(static_cast<const float*>(buf.ptr),
-                           buf.shape[0], buf.shape[1]);
+    return LineString<float>(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 
-inline LinearRing<double> linearring(const py::list& coords) {
-    auto arr = py_coords_to_array<double>(coords);
+// -- Polygon --
+inline Polygon<double> polygon(const py::array_t<double>& arr) {
     auto buf = arr.request();
-    return LinearRing<double>(static_cast<const double*>(buf.ptr),
-                               buf.shape[0], buf.shape[1]);
+    return Polygon<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
+}
+inline Polygon<float> polygon(const py::array_t<float>& arr) {
+    auto buf = arr.request();
+    return Polygon<float>(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 
-} // namespace shapely_py
+// -- LinearRing (double only for now) --
+inline LinearRing<double> linearring(const py::array_t<double>& arr) {
+    auto buf = arr.request();
+    return LinearRing<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
+}
 
 // ============================================================================
-// Cross-type distance wrappers
+// Cross-type distance
 // ============================================================================
-// pybind11 cannot bind templated member functions with args of a different
-// template parameter (e.g. LineString<double>::distance(Polygon<double>)).
-// Expose these via free functions.
-
-namespace shapely_py {
 
 inline double distance_pt_ls(const Point<double>& p, const LineString<double>& l) { return p.distance(l); }
 inline double distance_pt_poly(const Point<double>& p, const Polygon<double>& poly) { return p.distance(poly); }
 inline double distance_ls_poly(const LineString<double>& l, const Polygon<double>& poly) { return l.distance(poly); }
 inline double distance_poly_ls(const Polygon<double>& poly, const LineString<double>& l) { return poly.distance(l); }
 
-} // namespace shapely_py
-
 // ============================================================================
-// Cross-type intersects wrappers
+// Cross-type intersects
 // ============================================================================
-
-namespace shapely_py {
 
 inline bool intersects_ls_poly(const LineString<double>& l, const Polygon<double>& poly) { return l.intersects(poly); }
 inline bool intersects_poly_ls(const Polygon<double>& poly, const LineString<double>& l) { return poly.intersects(l); }
 inline bool intersects_poly_poly(const Polygon<double>& p1, const Polygon<double>& p2) { return p1.intersects(p2); }
 
-} // namespace shapely_py
-
 // ============================================================================
-// Predicate wrappers  (all cross-type pairs, float64)
+// Predicates — all 9 cross-type pairs
 // ============================================================================
-
-namespace shapely_py {
 
 // -- Point ↔ Point --
 inline bool pt_contains_pt(const Point<double>& s, const Point<double>& o) { return s.contains(o); }
@@ -269,23 +240,19 @@ inline bool poly_intersects_poly(const Polygon<double>& s, const Polygon<double>
 inline std::string poly_relate_poly(const Polygon<double>& s, const Polygon<double>& o) { return s.relate(o); }
 inline double poly_hausdorff_distance_poly(const Polygon<double>& s, const Polygon<double>& o) { return s.hausdorff_distance(o); }
 
-} // namespace shapely_py
-
 // ============================================================================
 // Centroid, project, interpolate
 // ============================================================================
 
-namespace shapely_py {
-
-inline std::tuple<double, double> centroid_point(const Point<double>& p) { auto r = p.centroid(); return {r.x, r.y}; }
-inline std::tuple<double, double> centroid_linestring(const LineString<double>& l) { auto r = l.centroid(); return {r.x, r.y}; }
-inline std::tuple<double, double> centroid_polygon(const Polygon<double>& p) { auto r = p.centroid(); return {r.x, r.y}; }
+inline std::tuple<double,double> centroid_point(const Point<double>& p) { auto r=p.centroid(); return {r.x,r.y}; }
+inline std::tuple<double,double> centroid_linestring(const LineString<double>& l) { auto r=l.centroid(); return {r.x,r.y}; }
+inline std::tuple<double,double> centroid_polygon(const Polygon<double>& p) { auto r=p.centroid(); return {r.x,r.y}; }
 
 inline double project_ls_pt(const LineString<double>& l, const Point<double>& p) { return l.project(p); }
-inline std::tuple<double, double> interpolate_ls(const LineString<double>& l, double d) { auto r = l.interpolate(d); return {r.x, r.y}; }
+inline std::tuple<double,double> interpolate_ls(const LineString<double>& l, double d) { auto r=l.interpolate(d); return {r.x,r.y}; }
 
 inline double intersection_area_poly_poly(const Polygon<double>& p1, const Polygon<double>& p2) {
-    auto inter = p1.intersection(p2); return inter.area();
+    return p1.intersection(p2).area();
 }
 
 inline py::array_t<double> polygon_exterior(const Polygon<double>& p) {
@@ -298,8 +265,6 @@ inline py::array_t<double> polygon_exterior(const Polygon<double>& p) {
 // ============================================================================
 // Pybind11 binding helper macros
 // ============================================================================
-// Use these in your PYBIND11_MODULE to consistently bind geometry classes
-// and cross-type predicates.  See tests/module.cpp for usage examples.
 
 #define BIND_PREDS(m, SRC, TGT) \
     m.def(#SRC "_contains_" #TGT, &shapely_py::SRC ## _contains_ ## TGT); \

@@ -1,12 +1,8 @@
 // pybind11 test module for shapelycpp — demonstrates pycpp wrapper usage.
 //
-// Includes all shapely geometry types, cross-type predicates, distance,
-// centroid, nearest_points, serialization, etc.
-//
-// Usage (consuming project):
-//   #include "shapelycpp/pycpp/geometry_py.h"
-//   #include "shapelycpp/pycpp/ops_py.h"
-//   PYBIND11_MODULE(my_module, m) { ... bind classes + use BIND_PREDS macros ... }
+// All factories are bound under a single Python name per geometry type
+// (e.g. "point" handles float64 AND float32 via pybind11 overload resolution).
+// No _f32 suffixes anywhere — dtype is selected by the input array/numpy type.
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
@@ -22,7 +18,7 @@ namespace py = pybind11;
 using namespace shapely::geometry;
 using namespace shapely_py;
 
-// Re-export native_to_array for module-local use (templated — supports float/double)
+// Re-export native_to_array for module-local use (templated)
 namespace {
 template <typename T>
 py::array_t<T> _native_to_array(const T* data, size_t rows, size_t cols) {
@@ -33,14 +29,18 @@ py::array_t<T> _native_to_array(const T* data, size_t rows, size_t cols) {
 PYBIND11_MODULE(shapelycpp, m) {
     m.doc() = "shapelycpp test module (powered by pycpp wrappers)";
 
-    // -- Factories (from pycpp) --
-    m.def("point",          &point,          py::arg("x"), py::arg("y"));
-    m.def("point_f32",      &point_f32,      py::arg("x"), py::arg("y"));
-    m.def("linestring",     &linestring,     py::arg("coords"));
-    m.def("linestring_f32", &linestring_f32, py::arg("coords"));
-    m.def("polygon",        &polygon,        py::arg("coords"));
-    m.def("polygon_f32",    &polygon_f32,    py::arg("coords"));
-    m.def("linearring",     &linearring,     py::arg("coords"));
+    // -- Factories — all under unified names, dtype selected via input type --
+    // point: scalar (x,y) → f64; array [x,y] with f32 dtype → f32
+    m.def("point", py::overload_cast<double, double>(&point), py::arg("x"), py::arg("y"));
+    m.def("point", py::overload_cast<const py::array_t<double>&>(&point), py::arg("coords"));
+    m.def("point", py::overload_cast<const py::array_t<float>&>(&point),  py::arg("coords"));
+
+    // linestring / polygon / linearring: array dtype selects f64 or f32
+    m.def("linestring", py::overload_cast<const py::array_t<double>&>(&linestring), py::arg("coords"));
+    m.def("linestring", py::overload_cast<const py::array_t<float>&>(&linestring),  py::arg("coords"));
+    m.def("polygon",    py::overload_cast<const py::array_t<double>&>(&polygon),    py::arg("coords"));
+    m.def("polygon",    py::overload_cast<const py::array_t<float>&>(&polygon),     py::arg("coords"));
+    m.def("linearring", py::overload_cast<const py::array_t<double>&>(&linearring), py::arg("coords"));
 
     // ======================================================================
     // Point<double> — full API
