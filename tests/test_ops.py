@@ -34,10 +34,10 @@ class TestNearestPointsPolygonLineString:
         x1, y1, x2, y2 = cpp.nearest_points(poly, ls)
         py_result = py_ops.nearest_points(py_poly, py_ls)
 
-        assert abs(x1 - py_result[0].x) < 1e-8, f"x1: {x1} vs {py_result[0].x}"
-        assert abs(y1 - py_result[0].y) < 1e-8, f"y1: {y1} vs {py_result[0].y}"
-        assert abs(x2 - py_result[1].x) < 1e-8, f"x2: {x2} vs {py_result[1].x}"
-        assert abs(y2 - py_result[1].y) < 1e-8, f"y2: {y2} vs {py_result[1].y}"
+        assert x1 == py_result[0].x, f"x1: {x1} vs {py_result[0].x}"
+        assert y1 == py_result[0].y, f"y1: {y1} vs {py_result[0].y}"
+        assert x2 == py_result[1].x, f"x2: {x2} vs {py_result[1].x}"
+        assert y2 == py_result[1].y, f"y2: {y2} vs {py_result[1].y}"
 
     def test_near(self, cpp):
         """Line is close to but not touching polygon."""
@@ -51,10 +51,10 @@ class TestNearestPointsPolygonLineString:
         x1, y1, x2, y2 = cpp.nearest_points(poly, ls)
         py_result = py_ops.nearest_points(py_poly, py_ls)
 
-        assert abs(x1 - py_result[0].x) < 1e-6
-        assert abs(y1 - py_result[0].y) < 1e-6
-        assert abs(x2 - py_result[1].x) < 1e-6
-        assert abs(y2 - py_result[1].y) < 1e-6
+        assert x1 == py_result[0].x
+        assert y1 == py_result[0].y
+        assert x2 == py_result[1].x
+        assert y2 == py_result[1].y
 
     def test_crossing(self, cpp):
         """Line crosses through polygon."""
@@ -68,10 +68,10 @@ class TestNearestPointsPolygonLineString:
         x1, y1, x2, y2 = cpp.nearest_points(poly, ls)
         py_result = py_ops.nearest_points(py_poly, py_ls)
 
-        assert abs(x1 - py_result[0].x) < 1e-8
-        assert abs(y1 - py_result[0].y) < 1e-8
-        assert abs(x2 - py_result[1].x) < 1e-8
-        assert abs(y2 - py_result[1].y) < 1e-8
+        assert x1 == py_result[0].x
+        assert y1 == py_result[0].y
+        assert x2 == py_result[1].x
+        assert y2 == py_result[1].y
 
     def test_random(self, cpp):
         rng = np.random.RandomState(777)
@@ -90,10 +90,10 @@ class TestNearestPointsPolygonLineString:
             x1, y1, x2, y2 = cpp.nearest_points(poly, ls)
             py_result = py_ops.nearest_points(py_poly, py_ls)
 
-            assert abs(x1 - py_result[0].x) < 1e-6
-            assert abs(y1 - py_result[0].y) < 1e-6
-            assert abs(x2 - py_result[1].x) < 1e-6
-            assert abs(y2 - py_result[1].y) < 1e-6
+            assert x1 == py_result[0].x
+            assert y1 == py_result[0].y
+            assert x2 == py_result[1].x
+            assert y2 == py_result[1].y
 
 
 class TestNearestPointsLineStringPoint:
@@ -109,10 +109,10 @@ class TestNearestPointsLineStringPoint:
         x1, y1, x2, y2 = cpp.nearest_points_ls_pt(ls, pt)
         py_result = py_ops.nearest_points(py_ls, py_pt)
 
-        assert abs(x1 - py_result[0].x) < 1e-8
-        assert abs(y1 - py_result[0].y) < 1e-8
-        assert abs(x2 - py_result[1].x) < 1e-8
-        assert abs(y2 - py_result[1].y) < 1e-8
+        assert x1 == py_result[0].x
+        assert y1 == py_result[0].y
+        assert x2 == py_result[1].x
+        assert y2 == py_result[1].y
 
     def test_point_endpoint(self, cpp):
         line = [(0.0, 0.0), (10.0, 0.0)]
@@ -124,10 +124,10 @@ class TestNearestPointsLineStringPoint:
         x1, y1, x2, y2 = cpp.nearest_points_ls_pt(ls, pt)
         py_result = py_ops.nearest_points(py_ls, py_pt)
 
-        assert abs(x1 - py_result[0].x) < 1e-8
-        assert abs(y1 - py_result[0].y) < 1e-8
-        assert abs(x2 - py_result[1].x) < 1e-8
-        assert abs(y2 - py_result[1].y) < 1e-8
+        assert x1 == py_result[0].x
+        assert y1 == py_result[0].y
+        assert x2 == py_result[1].x
+        assert y2 == py_result[1].y
 
     def test_random(self, cpp):
         rng = np.random.RandomState(42)
@@ -142,7 +142,7 @@ class TestNearestPointsLineStringPoint:
             x1, y1, x2, y2 = cpp.nearest_points_ls_pt(ls, pt)
             py_result = py_ops.nearest_points(py_ls, py_pt)
 
-            assert abs(x1 - py_result[0].x) < 1e-6
-            assert abs(y1 - py_result[0].y) < 1e-6
-            assert abs(x2 - py_result[1].x) < 1e-6
-            assert abs(y2 - py_result[1].y) < 1e-6
+            assert x1 == py_result[0].x
+            assert y1 == py_result[0].y
+            assert x2 == py_result[1].x
+            assert y2 == py_result[1].y

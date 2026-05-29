@@ -59,7 +59,7 @@ class TestPointDistancePoint:
         py_d = py_p1.distance(py_p2)
 
         assert abs(cpp_d - py_d) < atol, f"distance: {cpp_d} vs {py_d}"
-        assert abs(cpp_d - expected) < 1e-5, f"distance {cpp_d} != expected {expected}"
+        assert cpp_d == expected, f"distance {cpp_d} != expected {expected}"
 
     def test_random_pairs(self, make, rtol, atol):
         rng = np.random.RandomState(42)
@@ -88,7 +88,7 @@ class TestPointBuffer:
 
         cpp_area = cpp_buf.area()
         py_area = py_buf.area
-        assert abs(cpp_area - py_area) / max(py_area, 1e-10) < 0.01, \
+        assert cpp_area == py_area, \
             f"buffer area: cpp={cpp_area:.6f} py={py_area:.6f}"
 
     def test_buffer_zero(self, make):
@@ -120,7 +120,7 @@ class TestPointDistanceLineString:
 
         cpp_d = cpp.distance_point_linestring(pt, ls)
         py_d = py_pt.distance(py_ls)
-        assert abs(cpp_d - py_d) < 1e-8, f"dist: cpp={cpp_d} py={py_d}"
+        assert cpp_d == py_d, f"dist: cpp={cpp_d} py={py_d}"
 
     def test_random(self, cpp):
         rng = np.random.RandomState(99)
@@ -145,7 +145,7 @@ class TestPointDistancePolygon:
         py_poly = PyPolygon(sq)
         cpp_d = cpp.distance_point_polygon(pt, poly)
         py_d = py_pt.distance(py_poly)
-        assert abs(cpp_d - py_d) < 1e-8
+        assert cpp_d == py_d
 
     def test_inside(self, cpp):
         sq = make_square_coords()
@@ -155,7 +155,7 @@ class TestPointDistancePolygon:
         py_poly = PyPolygon(sq)
         cpp_d = cpp.distance_point_polygon(pt, poly)
         py_d = py_pt.distance(py_poly)
-        assert abs(cpp_d - py_d) < 1e-8
+        assert cpp_d == py_d
 
 
 # ======================================================================
@@ -306,7 +306,7 @@ class TestLineStringProject:
         py_pt = PyPoint(px, py)
         cpp_val = cpp.project_linestring_point(ls, pt)
         py_val = py_ls.project(py_pt)
-        assert abs(cpp_val - py_val) < 1e-8, f"project: cpp={cpp_val} py={py_val}"
+        assert cpp_val == py_val, f"project: cpp={cpp_val} py={py_val}"
 
 
 class TestLineStringInterpolate:
@@ -323,10 +323,10 @@ class TestLineStringInterpolate:
         py_ls = PyLineString(line)
         x, y = cpp.interpolate_linestring(ls, dist)
         py_pt = py_ls.interpolate(dist)
-        assert abs(x - py_pt.x) < 1e-8, f"x: {x} vs {py_pt.x}"
-        assert abs(y - py_pt.y) < 1e-8, f"y: {y} vs {py_pt.y}"
-        assert abs(x - expected[0]) < 1e-6
-        assert abs(y - expected[1]) < 1e-6
+        assert x == py_pt.x, f"x: {x} vs {py_pt.x}"
+        assert y == py_pt.y, f"y: {y} vs {py_pt.y}"
+        assert x == expected[0]
+        assert y == expected[1]
 
 
 # ======================================================================
@@ -377,7 +377,7 @@ class TestPolygonDistancePolygon:
         cpp_d = p1.distance(p2)
         py_d = py_p1.distance(py_p2)
         assert abs(cpp_d - py_d) < atol, f"dist: cpp={cpp_d} py={py_d}"
-        assert abs(cpp_d - 10.0) < 1e-5
+        assert cpp_d == 10.0
 
     def test_overlapping(self, make):
         atol = 1e-6 if make['dtype'] == np.float32 else 1e-8
@@ -493,7 +493,7 @@ class TestPolygonIntersection:
         py_p2 = PyPolygon(sq2)
         cpp_inter_area = cpp.intersection_area_polygon_polygon(p1, p2)
         py_inter_area = py_p1.intersection(py_p2).area
-        assert abs(cpp_inter_area - py_inter_area) / max(py_inter_area, 1e-10) < 0.01
+        assert cpp_inter_area == py_inter_area
 
     def test_no_overlap(self, cpp):
         sq1 = make_square_coords(0, 0, 5)
@@ -504,4 +504,4 @@ class TestPolygonIntersection:
         py_p2 = PyPolygon(sq2)
         cpp_inter_area = cpp.intersection_area_polygon_polygon(p1, p2)
         py_inter_area = py_p1.intersection(py_p2).area
-        assert abs(cpp_inter_area - py_inter_area) < 1e-8
+        assert cpp_inter_area == py_inter_area

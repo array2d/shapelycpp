@@ -123,7 +123,8 @@ bool ls_equals_exact_##SUFFIX(const LineString<GT>& s, const OTHER<GT>& o, doubl
 bool ls_intersects_##SUFFIX(const LineString<GT>& s, const OTHER<GT>& o) { return s.intersects(o); } \
 std::string ls_relate_##SUFFIX(const LineString<GT>& s, const OTHER<GT>& o) { return s.relate(o); } \
 bool ls_relate_pattern_##SUFFIX(const LineString<GT>& s, const OTHER<GT>& o, const std::string& p) { return s.relate_pattern(o, p); } \
-double ls_hausdorff_##SUFFIX(const LineString<GT>& s, const OTHER<GT>& o) { return s.hausdorff_distance(o); }
+double ls_hausdorff_##SUFFIX(const LineString<GT>& s, const OTHER<GT>& o) { return s.hausdorff_distance(o); } \
+	double ls_dist_##SUFFIX(const LineString<GT>& s, const OTHER<GT>& o) { return s.distance(o); }
 
 DEF_LS_PRED(double, Point, pt)
 DEF_LS_PRED(double, LineString, ls)
@@ -144,7 +145,8 @@ bool poly_equals_exact_##SUFFIX(const Polygon<GT>& s, const OTHER<GT>& o, double
 bool poly_intersects_##SUFFIX(const Polygon<GT>& s, const OTHER<GT>& o) { return s.intersects(o); } \
 std::string poly_relate_##SUFFIX(const Polygon<GT>& s, const OTHER<GT>& o) { return s.relate(o); } \
 bool poly_relate_pattern_##SUFFIX(const Polygon<GT>& s, const OTHER<GT>& o, const std::string& p) { return s.relate_pattern(o, p); } \
-double poly_hausdorff_##SUFFIX(const Polygon<GT>& s, const OTHER<GT>& o) { return s.hausdorff_distance(o); }
+double poly_hausdorff_##SUFFIX(const Polygon<GT>& s, const OTHER<GT>& o) { return s.hausdorff_distance(o); } \
+	double poly_dist_##SUFFIX(const Polygon<GT>& s, const OTHER<GT>& o) { return s.distance(o); }
 
 DEF_POLY_PRED(double, Point, pt)
 DEF_POLY_PRED(double, LineString, ls)
@@ -208,6 +210,7 @@ m.def(#PREFIX "_equals_" #SUFFIX, &PREFIX ## _equals_ ## SUFFIX); \
 m.def(#PREFIX "_equals_exact_" #SUFFIX, &PREFIX ## _equals_exact_ ## SUFFIX, py::arg("self"), py::arg("other"), py::arg("tolerance")); \
 m.def(#PREFIX "_intersects_" #SUFFIX, &PREFIX ## _intersects_ ## SUFFIX); \
 m.def(#PREFIX "_relate_" #SUFFIX, &PREFIX ## _relate_ ## SUFFIX); \
+	m.def(#PREFIX "_distance_" #SUFFIX, &PREFIX ## _dist_ ## SUFFIX); \
 m.def(#PREFIX "_relate_pattern_" #SUFFIX, &PREFIX ## _relate_pattern_ ## SUFFIX, py::arg("self"), py::arg("other"), py::arg("pattern")); \
 m.def(#PREFIX "_hausdorff_distance_" #SUFFIX, &PREFIX ## _hausdorff_ ## SUFFIX);
 

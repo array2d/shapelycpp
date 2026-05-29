@@ -33,13 +33,13 @@ class TestPoint:
     def test_accessors(self, cpp, C, x, y):
         cpt = C.point(x, y)
         ppt = py_point(x, y)
-        assert abs(cpt.x - ppt.x) < 1e-10
-        assert abs(cpt.y - ppt.y) < 1e-10
+        assert cpt.x == ppt.x
+        assert cpt.y == ppt.y
         assert cpt.is_empty() == ppt.is_empty
         assert cpt.is_simple() == ppt.is_simple
         assert cpt.is_valid() == ppt.is_valid
-        assert cpt.area() == pytest.approx(ppt.area, abs=1e-10)
-        assert cpt.length() == pytest.approx(ppt.length, abs=1e-10)
+        assert cpt.area() == ppt.area
+        assert cpt.length() == ppt.length
         assert cpt.has_z() == ppt.has_z
         assert cpt.geom_type() == ppt.geom_type
         assert cpt.type() == "Point"
@@ -59,7 +59,7 @@ class TestPoint:
         p = C.point(1.5, -2.5)
         cs = list(p.coords())
         assert len(cs) == 1
-        assert abs(cs[0][0] - 1.5) < 1e-10
+        assert cs[0][0] == 1.5
         assert abs(cs[0][1] - (-2.5)) < 1e-10
         xs, ys = p.xy()
         assert xs == [1.5] and ys == [-2.5]
@@ -68,8 +68,8 @@ class TestPoint:
     def test_centroid(self, cpp, C, x, y):
         cx, cy = cpp.centroid_point(C.point(x, y))
         pc = py_point(x, y).centroid
-        assert abs(cx - pc.x) < 1e-10
-        assert abs(cy - pc.y) < 1e-10
+        assert cx == pc.x
+        assert cy == pc.y
 
     def test_buffer(self, cpp, C):
         buf = C.point(0, 0).buffer(10.0)
@@ -129,8 +129,8 @@ class TestLineString:
         assert c_ls.is_empty() == p_ls.is_empty
         assert c_ls.is_simple() == p_ls.is_simple
         assert c_ls.is_valid() == p_ls.is_valid
-        assert c_ls.area() == pytest.approx(p_ls.area, abs=1e-10)
-        assert c_ls.length() == pytest.approx(p_ls.length, abs=1e-8)
+        assert c_ls.area() == p_ls.area
+        assert c_ls.length() == p_ls.length
         assert c_ls.bounds() == list(p_ls.bounds)
 
     def test_is_closed_ring(self, cpp, C):
@@ -145,16 +145,16 @@ class TestLineString:
         pts = [(1,2),(3,4),(5,6)]
         c_ls = C.linestring(pts)
         for (cx, cy), (px, py) in zip(c_ls.coords(), pts):
-            assert abs(cx - px) < 1e-10
-            assert abs(cy - py) < 1e-10
+            assert cx == px
+            assert cy == py
         xs, ys = c_ls.xy()
         assert xs == [1.,3.,5.] and ys == [2.,4.,6.]
 
     def test_centroid(self, cpp, C):
         cx, cy = cpp.centroid_linestring(C.linestring([(0,0),(10,0),(10,10)]))
         pc = py_linestring([(0,0),(10,0),(10,10)]).centroid
-        assert abs(cx - pc.x) < 1e-8
-        assert abs(cy - pc.y) < 1e-8
+        assert cx == pc.x
+        assert cy == pc.y
 
     def test_predicates(self, cpp, C):
         ls1 = C.linestring([(0,5),(10,5)])
@@ -203,29 +203,29 @@ class TestPolygon:
         assert cp.is_empty() == pp.is_empty
         assert cp.is_simple() == pp.is_simple
         assert cp.is_valid() == pp.is_valid
-        assert cp.area() == pytest.approx(pp.area, abs=1e-8)
-        assert cp.length() == pytest.approx(pp.length, abs=1e-8)
+        assert cp.area() == pp.area
+        assert cp.length() == pp.length
         assert cp.bounds() == list(pp.bounds)
 
     def test_centroid(self, cpp, C):
         for coords in [self.SQ, [(0,0),(10,0),(5,8)], [(0,0),(10,0),(10,5),(5,10),(0,5)]]:
             cx, cy = cpp.centroid_polygon(C.polygon(coords))
             pc = py_polygon(coords).centroid
-            assert abs(cx - pc.x) < 1e-8
-            assert abs(cy - pc.y) < 1e-8
+            assert cx == pc.x
+            assert cy == pc.y
 
     def test_exterior(self, cpp, C):
         ext = cpp.polygon_exterior(C.polygon(self.SQ))
         pext = py_polygon(self.SQ).exterior
         assert ext.shape[0] == len(pext.coords)
         for i, (cpt, ppt) in enumerate(zip(ext, pext.coords)):
-            assert abs(cpt[0] - ppt[0]) < 1e-10
-            assert abs(cpt[1] - ppt[1]) < 1e-10
+            assert cpt[0] == ppt[0]
+            assert cpt[1] == ppt[1]
 
     def test_coords(self, cpp, C):
         coords = list(C.polygon(self.SQ).coords())
         for (cx, cy), (x, y) in zip(coords, self.SQ):
-            assert abs(cx - x) < 1e-10
+            assert cx == x
 
     def test_predicates_poly_poly(self, cpp, C):
         sq = C.polygon(self.SQ)
@@ -293,9 +293,9 @@ class TestLinearRing:
         assert cr.is_valid() == pr.is_valid
         assert cr.is_closed() == pr.is_closed
         assert cr.is_ring() == pr.is_ring
-        assert cr.length() == pytest.approx(pr.length, abs=1e-8)
+        assert cr.length() == pr.length
         assert cr.bounds() == list(pr.bounds)
-        assert cr.area() == pytest.approx(pr.area, abs=1e-10)
+        assert cr.area() == pr.area
 
     def test_wkt(self, cpp, C):
         assert_same_wkt(C.linearring(self.RING_SQ).wkt(), py_linearring(self.RING_SQ).wkt)
@@ -309,8 +309,8 @@ class TestLinearRing:
     def test_coords_xy(self, cpp, C):
         cr = C.linearring(self.RING_SQ)
         for (cx, cy), (x, y) in zip(cr.coords(), self.RING_SQ):
-            assert abs(cx - x) < 1e-10
-            assert abs(cy - y) < 1e-10
+            assert cx == x
+            assert cy == y
         xs, ys = cr.xy()
         assert len(xs) == 4 and len(ys) == 4
 

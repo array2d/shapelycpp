@@ -6,7 +6,7 @@ from shapely.geometry import Point as PyPoint, LineString as PyLineString, Polyg
 
 
 def compare(cpp_result, py_result, rtol=1e-12, atol=1e-12, label=""):
-    """Compare C++ result against Python shapely (ground-truth) result.
+    """Compare C++ result against Python shapely (ground-truth) result -- BIT-IDENTICAL (strict equality), since both use the same GEOS engine.
 
     Returns a dict with: pass, max_abs_diff, max_rel_diff, shape_match,
     cpp_shape, py_shape, cpp_dtype, py_dtype, label.
@@ -47,7 +47,7 @@ def compare(cpp_result, py_result, rtol=1e-12, atol=1e-12, label=""):
     if not passed:
         worst_idx = int(np.argmax(abs_diff))
         info["error"] = (
-            f"numerical mismatch: max_abs_diff={max_abs:.2e}, "
+            f"bit mismatch: max_abs_diff={max_abs:.2e}, "
             f"max_rel_diff={max_rel:.2e} at idx {worst_idx}\n"
             f"  C++ value: {cpp.flat[worst_idx]:.16e}\n"
             f"  Py  value: {py.flat[worst_idx]:.16e}"

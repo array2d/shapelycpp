@@ -26,6 +26,7 @@
 #include <geos/io/WKBReader.h>
 #include <geos/io/WKBWriter.h>
 #include <geos/algorithm/distance/DiscreteHausdorffDistance.h>
+#include <geos/operation/distance/DistanceOp.h>
 #include <geos/simplify/TopologyPreservingSimplifier.h>
 #include <geos/operation/valid/IsValidOp.h>
 
@@ -185,6 +186,13 @@ inline double geos_area(const geos::geom::Geometry* g) {
 // Python: shapely/geometry/base.py::length:L447
 inline double geos_length(const geos::geom::Geometry* g) {
     return g ? g->getLength() : 0.0;
+}
+
+// Python: shapely/geometry/base.py::distance:L438
+inline double geos_distance(const geos::geom::Geometry* a, const geos::geom::Geometry* b) {
+    if (!a || !b) return 0.0;
+    geos::operation::distance::DistanceOp op(a, b);
+    return op.distance();
 }
 
 // Python: shapely/geometry/base.py::hausdorff_distance:L442
