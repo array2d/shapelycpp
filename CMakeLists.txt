@@ -29,7 +29,12 @@ target_compile_features(shapelycpp INTERFACE cxx_std_17)
 
 # ---- Install — header-only C++ library --------------------------------------
 # shapely/     — pure native C++ (zero pybind11 dependency)
+# pycpp/       — pybind11 wrappers (thin layer)
 install(DIRECTORY shapely
+    DESTINATION include/shapelycpp
+    FILES_MATCHING PATTERN "*.h"
+)
+install(DIRECTORY pycpp
     DESTINATION include/shapelycpp
     FILES_MATCHING PATTERN "*.h"
 )
