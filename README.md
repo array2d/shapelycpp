@@ -135,11 +135,14 @@ shapelycpp/
 │   │   └── polygon.h
 │   └── ops/
 │       └── nearest_points.h
+├── pycpp/              # pybind11 wrappers (thin layer: Python types → native C++)
+│   ├── geometry_py.h   #   factories, cross-type predicates, distance, accessors
+│   └── ops_py.h        #   nearest_points
 ├── example/            # native C++ usage examples
 │   ├── CMakeLists.txt
 │   └── main.cpp
 ├── tests/              # Python precision alignment tests
-│   ├── module.cpp      # pybind11 test module
+│   ├── module.cpp      # pybind11 test module (uses pycpp wrappers)
 │   ├── conftest.py     # pytest fixtures (float64/float32 make, CppFactory)
 │   ├── utils.py        # coordinate generators & comparison helpers
 │   └── test_api.py     # unified precision alignment tests (float64/float32)
