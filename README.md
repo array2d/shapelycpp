@@ -25,14 +25,52 @@ When using `Point<double>`, `LineString<double>`, `Polygon<double>` (the default
 - Python shapely calls `GEOSDistance_r()` (C API), which internally invokes the same `DistanceOp::distance()` as the C++ `shapelycpp`.
 - `LinearRing` / `Polygon` / `LineString` constructors both populate `geos::geom::CoordinateSequence` via the same `Coordinate(x, y)` path.
 
-### `float` (C++) ↔ Python shapely: NOT bit-identical
+### `float` (C++) vs Python shapely: Bit-identical with input truncation
 
-When using `Point<float>`, `LineString<float>`, `Polygon<float>`:
+Python shapely has no `float32` mode — all coordinates are auto-promoted to Python `float` (C `double`). However, **bit-identical results can still be achieved** by truncating inputs to `float32` *before* passing them to both sides:
 
-- **Python shapely has no `float32` mode.** All coordinates are automatically promoted to Python `float` (C `double`).
-- The C++ `float` → `double` widening during `Coordinate` construction introduces precision loss (~7 significant digits for `float32` vs ~15 for `float64`).
-- Results may differ from Python shapely by up to `1e-5` in relative/absolute terms for `float32`.
-- Use `float` precision only when bit-identical alignment with Python shapely is NOT required (e.g., GPU-accelerated computation where `float32` throughput matters).
+| Strategy | C++ side | Python side | GEOS internal `double` value | Result |
+|----------|----------|-------------|------------------------------|--------|
+| Truncate inputs to `float32`, then pass to both | `Point<float>` constructor widens to `double` | `PyPoint(f32_x, f32_y)` receives `float` | **Identical** | **Bit-identical** ✅ |
+
+This works because:
+1. Every `float32` value is **exactly representable** in `float64` — no rounding occurs during widening.
+2. `np.float32(x)` → `float(np.float32(x))` produces the same `double` value that C++ `Point<float>` uses internally.
+3. Both C++ and Python then feed the **identical `double` value** into GEOS's `Coordinate(x, y)` → `CoordinateSequence` → `DistanceOp::distance()` → **same result**.
+
+```python
+# Example: float32 bit-alignment strategy
+def _f32(coords):
+    """Truncate to float32 first so both sides receive identical doubles."""
+    if isinstance(coords, tuple):
+        return tuple(_f32(list(coords)))
+    if isinstance(coords, (int, float)):
+        return float(np.float32(coords))
+    return [(_f32(c[0]), _f32(c[1])) for c in coords]
+
+# Usage in tests
+f32_coords = _f32(original_coords)
+cpp_result = cpp_point_f32.distance(cpp_polygon_f32)   # C++ f32 path
+py_result  = PyPoint(f32_coords).distance(PyPolygon(f32_coords))  # Python f64 path
+assert cpp_result == py_result  # strict equality — bit-identical
+```
+
+> **Note**: Without input truncation, C++ `float` results will differ from Python `double` results (up to ~`1e-5` relative error), because the C++ side truncates to `float32` while Python retains full `float64` precision — the two sides feed *different* `double` values into GEOS.
+
+### Collision-critical operations
+
+The following patterns from production collision detection code are covered by exhaustive tests (1,000+ random pairs per pattern, plus deterministic boundary edge cases), all verified with **strict equality** (`==`):
+
+| # | Pattern | Production usage |
+|---|---------|-----------------|
+| 1 | Polygon ↔ Polygon distance | `bool collision = (distance == 0.0)` |
+| 2 | Polygon ↔ LineString distance | `double d = poly.distance(line)` |
+| 3 | `intersects` + `distance` | `intersects(g1, g2) && distance(g1, g2) < 1e-12` |
+| 4 | LineString ↔ Point distance | `dist = line.distance(ego_pt)` |
+| 5 | LineString ↔ LineString distance | `half_lane_width = line1.distance(line2) / 2.0` |
+| 6 | LineString ↔ Polygon (both directions) | `centerline.distance(poly)`; `poly.distance(line)` |
+
+Edge cases tested at collision decision boundaries: touching edges/vertices, ε-overlap (`1e-12`), near-touching (`1e-12` gap), point-on-boundary, parallel-near segments, collinear-near segments, and endpoint-on-boundary.
 
 ## Quick Start
 
