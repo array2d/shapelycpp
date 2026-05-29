@@ -72,7 +72,8 @@ set(CPACK_DEB_COMPONENT_INSTALL            OFF)
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER        "array2d")
 set(CPACK_DEBIAN_PACKAGE_SECTION           "libdevel")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY          "optional")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS           "libgeos-dev")
+# No hard Depends — shapelycpp is header-only; GEOS is only needed when
+# compiling tests or downstream projects that use GEOS features.
 set(CPACK_DEBIAN_FILE_NAME                 "shapelycpp-dev-${CPACK_PACKAGE_VERSION}-Linux.deb")
 set(CPACK_PACKAGING_INSTALL_PREFIX         "/usr")
 
@@ -93,4 +94,4 @@ endif()
 message(STATUS "shapelycpp v${PROJECT_VERSION}  (header-only C++ library)")
 message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "  DEB:  make deb  →  shapelycpp-dev-${CPACK_PACKAGE_VERSION}-Linux.deb")
-message(STATUS "  Install: sudo apt-get install -y libgeos-dev")
+message(STATUS "  GEOS (optional): install geos-local or libgeos-dev if downstream code links GEOS")
