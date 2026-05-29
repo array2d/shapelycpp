@@ -87,8 +87,8 @@ public:
     template <typename U> Point<double> intersection(const Point<U>& other) const;
     MultiPoint<double> union_op(const MultiPoint<double>& other) const;
     template <typename U> MultiPoint<double> union_op(const Point<U>& other) const;
-    MultiPoint<double> sym_difference(const MultiPoint<double>& other) const;
-    template <typename U> MultiPoint<double> sym_difference(const Point<U>& other) const;
+    MultiPoint<double> symmetric_difference(const MultiPoint<double>& other) const;
+    template <typename U> MultiPoint<double> symmetric_difference(const Point<U>& other) const;
     MultiPoint<double> simplify(double tolerance) const;
 
     // -- Accessors --
@@ -339,7 +339,7 @@ MultiPoint<double> MultiPoint<T>::union_op(const Point<U>& o) const {
     return MultiPoint<double>(c.data(), n, 2);
 }
 template <typename T>
-MultiPoint<double> MultiPoint<T>::sym_difference(const MultiPoint<double>& o) const {
+MultiPoint<double> MultiPoint<T>::symmetric_difference(const MultiPoint<double>& o) const {
     auto res = detail::geos_sym_difference(geos_multipoint_.get(), o.geos_multipoint_.get());
     if (!res || res->isEmpty()) return MultiPoint<double>();
     auto* mpt = dynamic_cast<geos::geom::MultiPoint*>(res.get());
@@ -353,7 +353,7 @@ MultiPoint<double> MultiPoint<T>::sym_difference(const MultiPoint<double>& o) co
     return MultiPoint<double>(c.data(), n, 2);
 }
 template <typename T> template <typename U>
-MultiPoint<double> MultiPoint<T>::sym_difference(const Point<U>& o) const {
+MultiPoint<double> MultiPoint<T>::symmetric_difference(const Point<U>& o) const {
     auto res = detail::geos_sym_difference(geos_multipoint_.get(), o.geos_point_.get());
     if (!res || res->isEmpty()) return MultiPoint<double>();
     auto* mpt = dynamic_cast<geos::geom::MultiPoint*>(res.get());

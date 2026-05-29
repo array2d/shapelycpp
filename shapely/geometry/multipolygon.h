@@ -113,7 +113,7 @@ public:
     MultiPolygon<double> difference(const MultiPolygon<double>& other) const;
     MultiPolygon<double> intersection(const MultiPolygon<double>& other) const;
     MultiPolygon<double> union_op(const MultiPolygon<double>& other) const;
-    MultiPolygon<double> sym_difference(const MultiPolygon<double>& other) const;
+    MultiPolygon<double> symmetric_difference(const MultiPolygon<double>& other) const;
     MultiPolygon<double> simplify(double tolerance) const;
 
     // -- Accessors --
@@ -313,7 +313,7 @@ template <typename T> MultiPolygon<double> MultiPolygon<T>::OP(const MultiPolygo
 MPY_CONSTRUCT(difference,       geos_difference)
 MPY_CONSTRUCT(intersection,     geos_intersection)
 MPY_CONSTRUCT(union_op,         geos_union)
-MPY_CONSTRUCT(sym_difference,   geos_sym_difference)
+MPY_CONSTRUCT(symmetric_difference,   geos_sym_difference)
 #undef MPY_CONSTRUCT
 
 template <typename T>

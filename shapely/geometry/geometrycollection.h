@@ -48,7 +48,7 @@ public:
     GeometryCollection difference(const GeometryCollection& other) const;
     GeometryCollection intersection(const GeometryCollection& other) const;
     GeometryCollection union_op(const GeometryCollection& other) const;
-    GeometryCollection sym_difference(const GeometryCollection& other) const;
+    GeometryCollection symmetric_difference(const GeometryCollection& other) const;
     GeometryCollection simplify(double tolerance) const;
 
     // -- Accessors --
@@ -155,7 +155,7 @@ GeometryCollection GeometryCollection::OP(const GeometryCollection& o) const { \
 GC_CONSTRUCT(difference,       geos_difference)
 GC_CONSTRUCT(intersection,     geos_intersection)
 GC_CONSTRUCT(union_op,         geos_union)
-GC_CONSTRUCT(sym_difference,   geos_sym_difference)
+GC_CONSTRUCT(symmetric_difference,   geos_sym_difference)
 #undef GC_CONSTRUCT
 
 GeometryCollection GeometryCollection::simplify(double tol) const {

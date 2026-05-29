@@ -50,6 +50,86 @@ public:
     std::vector<std::tuple<T, T>> coords() const;
     std::tuple<std::vector<T>, std::vector<T>> xy() const;
 
+    // -- Distance --
+    double distance(const LinearRing& other) const;
+    template <typename U> double distance(const Point<U>& other) const;
+    template <typename U> double distance(const LineString<U>& other) const;
+
+    // -- Buffer --
+    Polygon<double> buffer(double distance) const;
+
+    // -- Boundary --
+    std::string boundary() const;
+
+    // -- Predicates --
+    template <typename U> bool contains(const Point<U>& other) const;
+    template <typename U> bool contains(const LineString<U>& other) const;
+    template <typename U> bool within(const Point<U>& other) const;
+    template <typename U> bool within(const LineString<U>& other) const;
+    template <typename U> bool crosses(const Point<U>& other) const;
+    template <typename U> bool crosses(const LineString<U>& other) const;
+    template <typename U> bool disjoint(const Point<U>& other) const;
+    template <typename U> bool disjoint(const LineString<U>& other) const;
+    template <typename U> bool overlaps(const Point<U>& other) const;
+    template <typename U> bool overlaps(const LineString<U>& other) const;
+    template <typename U> bool touches(const Point<U>& other) const;
+    template <typename U> bool touches(const LineString<U>& other) const;
+    template <typename U> bool covers(const Point<U>& other) const;
+    template <typename U> bool covers(const LineString<U>& other) const;
+    template <typename U> bool covered_by(const Point<U>& other) const;
+    template <typename U> bool covered_by(const LineString<U>& other) const;
+    template <typename U> bool equals(const Point<U>& other) const;
+    template <typename U> bool equals(const LineString<U>& other) const;
+    template <typename U> bool equals_exact(const Point<U>& other, double tol) const;
+    template <typename U> bool equals_exact(const LineString<U>& other, double tol) const;
+
+    bool intersects(const LinearRing& other) const;
+    template <typename U> bool intersects(const Point<U>& other) const;
+    template <typename U> bool intersects(const LineString<U>& other) const;
+
+    // -- DE-9IM --
+    template <typename U> std::string relate(const Point<U>& other) const;
+    template <typename U> std::string relate(const LineString<U>& other) const;
+    std::string relate(const LinearRing& other) const;
+    template <typename U> bool relate_pattern(const Point<U>& other, const std::string& p) const;
+    template <typename U> bool relate_pattern(const LineString<U>& other, const std::string& p) const;
+    bool relate_pattern(const LinearRing& other, const std::string& p) const;
+
+    // -- Hausdorff distance --
+    template <typename U> double hausdorff_distance(const Point<U>& other) const;
+    template <typename U> double hausdorff_distance(const LineString<U>& other) const;
+    double hausdorff_distance(const LinearRing& other) const;
+
+    // -- Constructive operations --
+    std::string difference(const LinearRing& other) const;
+    template <typename U> std::string difference(const Point<U>& other) const;
+    template <typename U> std::string difference(const LineString<U>& other) const;
+    std::string intersection(const LinearRing& other) const;
+    template <typename U> std::string intersection(const Point<U>& other) const;
+    template <typename U> std::string intersection(const LineString<U>& other) const;
+    std::string union_op(const LinearRing& other) const;
+    template <typename U> std::string union_op(const Point<U>& other) const;
+    template <typename U> std::string union_op(const LineString<U>& other) const;
+    std::string symmetric_difference(const LinearRing& other) const;
+    template <typename U> std::string symmetric_difference(const Point<U>& other) const;
+    template <typename U> std::string symmetric_difference(const LineString<U>& other) const;
+    std::string simplify(double tolerance) const;
+
+    // -- Project / interpolate --
+    template <typename U> double project(const Point<U>& other) const;
+    Point<double> interpolate(double distance) const;
+
+    // -- Parallel offset --
+    std::string parallel_offset(double distance, int quad_segs = 16) const;
+
+    // -- Topology --
+    Polygon<double> convex_hull() const;
+    Polygon<double> envelope() const;
+    Point<double> representative_point() const;
+
+    // -- Minimum clearance --
+    double minimum_clearance() const;
+
     // -- Properties --
     bool is_empty() const;
     bool is_simple() const;
@@ -75,6 +155,7 @@ public:
 private:
     template <typename U> friend class Polygon;
     template <typename U> friend class LineString;
+    template <typename U> friend class Point;
     std::vector<T> coords_;
     size_t rows_ = 0, cols_ = 0;
     std::unique_ptr<geos::geom::LinearRing> geos_ring_;
@@ -178,6 +259,8 @@ public:
     bool is_empty() const;
     bool is_simple() const;
     bool is_valid() const;
+    bool is_closed() const;
+    bool is_ring() const;
     double length() const;
     std::vector<double> bounds() const;
 
@@ -185,7 +268,7 @@ public:
     Polygon<double> intersection(const Polygon<double>& other) const;
     Polygon<double> difference(const Polygon<double>& other) const;
     Polygon<double> union_op(const Polygon<double>& other) const;
-    Polygon<double> sym_difference(const Polygon<double>& other) const;
+    Polygon<double> symmetric_difference(const Polygon<double>& other) const;
     Polygon<double> simplify(double tolerance) const;
     Polygon<double> convex_hull() const;
     Polygon<double> boundary() const;
@@ -193,6 +276,13 @@ public:
     Point<double> representative_point() const;
     Point<double> centroid() const;
     Polygon<double> buffer(double distance) const;
+
+    // -- Minimum clearance (Python: .minimum_clearance) --
+    double minimum_clearance() const;
+
+    // -- Project / interpolate (Python: .project, .interpolate) --
+    template <typename U> double project(const Point<U>& other) const;
+    Point<double> interpolate(double distance) const;
 
     // -- Static-like factory (Python: from_bounds) --
     static Polygon<double> from_bounds(double minx, double miny, double maxx, double maxy);
@@ -234,6 +324,7 @@ private:
 #include <geos/geom/LinearRing.h>
 #include <geos/operation/distance/DistanceOp.h>
 #include <geos/algorithm/Orientation.h>
+#include <geos/linearref/LengthIndexedLine.h>
 #include <geos/util/TopologyException.h>
 #include <stdexcept>
 
@@ -341,6 +432,204 @@ Point<double> LinearRing<T>::centroid() const {
 
 template <typename T>
 void LinearRing<T>::normalize() { geos_ring_->normalize(); }
+
+// -- distance ----------------------------------------------------------------
+
+template <typename T>
+double LinearRing<T>::distance(const LinearRing& o) const {
+    geos::operation::distance::DistanceOp op(geos_ring_.get(), o.geos_ring_.get());
+    return op.distance();
+}
+template <typename T> template <typename U>
+double LinearRing<T>::distance(const Point<U>& o) const {
+    geos::operation::distance::DistanceOp op(geos_ring_.get(), o.geos_point_.get());
+    return op.distance();
+}
+template <typename T> template <typename U>
+double LinearRing<T>::distance(const LineString<U>& o) const {
+    geos::operation::distance::DistanceOp op(geos_ring_.get(), o.geos_linestring_.get());
+    return op.distance();
+}
+
+// -- buffer ------------------------------------------------------------------
+
+template <typename T>
+Polygon<double> LinearRing<T>::buffer(double distance) const {
+    if (!geos_ring_ || geos_ring_->isEmpty()) return Polygon<double>();
+    auto buf = geos_ring_->buffer(distance, 16);
+    if (!buf || buf->isEmpty()) return Polygon<double>();
+    const auto* poly = buf.get();
+    if (poly->getGeometryTypeId() != geos::geom::GEOS_POLYGON) {
+        if (poly->getNumGeometries() > 0) poly = poly->getGeometryN(0);
+    }
+    if (poly->getGeometryTypeId() != geos::geom::GEOS_POLYGON || poly->isEmpty()) return Polygon<double>();
+    auto* gp = dynamic_cast<const geos::geom::Polygon*>(poly);
+    if (!gp) return Polygon<double>();
+    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
+    if (!cs || cs->isEmpty()) return Polygon<double>();
+    size_t n = cs->getSize();
+    std::vector<double> c(n*2);
+    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
+    return Polygon<double>(c.data(), n, 2);
+}
+
+// -- boundary ----------------------------------------------------------------
+
+template <typename T>
+std::string LinearRing<T>::boundary() const {
+    auto res = detail::geos_boundary(geos_ring_.get());
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+
+// -- predicates (delegate through GEOS ring which IS-A LineString) ------------
+
+#define LR_PRED_IMPL(METHOD, GEOS_FN) \
+template <typename T> template <typename U> \
+bool LinearRing<T>::METHOD(const Point<U>& o) const { return detail::GEOS_FN(geos_ring_.get(), o.geos_point_.get()); } \
+template <typename T> template <typename U> \
+bool LinearRing<T>::METHOD(const LineString<U>& o) const { return detail::GEOS_FN(geos_ring_.get(), o.geos_linestring_.get()); }
+
+LR_PRED_IMPL(contains,    geos_contains)
+LR_PRED_IMPL(within,      geos_within)
+LR_PRED_IMPL(crosses,     geos_crosses)
+LR_PRED_IMPL(disjoint,    geos_disjoint)
+LR_PRED_IMPL(overlaps,    geos_overlaps)
+LR_PRED_IMPL(touches,     geos_touches)
+LR_PRED_IMPL(covers,      geos_covers)
+LR_PRED_IMPL(covered_by,  geos_covered_by)
+LR_PRED_IMPL(equals,      geos_equals)
+#undef LR_PRED_IMPL
+
+template <typename T> template <typename U>
+bool LinearRing<T>::equals_exact(const Point<U>& o, double tol) const { return detail::geos_equals_exact(geos_ring_.get(), o.geos_point_.get(), tol); }
+template <typename T> template <typename U>
+bool LinearRing<T>::equals_exact(const LineString<U>& o, double tol) const { return detail::geos_equals_exact(geos_ring_.get(), o.geos_linestring_.get(), tol); }
+
+// -- intersects -----------
+
+template <typename T>
+bool LinearRing<T>::intersects(const LinearRing& o) const { return geos_ring_->intersects(o.geos_ring_.get()); }
+template <typename T> template <typename U>
+bool LinearRing<T>::intersects(const Point<U>& o) const { return geos_ring_->intersects(o.geos_point_.get()); }
+template <typename T> template <typename U>
+bool LinearRing<T>::intersects(const LineString<U>& o) const { return geos_ring_->intersects(o.geos_linestring_.get()); }
+
+// -- relate / relate_pattern -----------
+
+#define LR_RELATE_IMPL \
+template <typename T> template <typename U> std::string LinearRing<T>::relate(const Point<U>& o) const { return detail::geos_relate(geos_ring_.get(), o.geos_point_.get()); } \
+template <typename T> template <typename U> std::string LinearRing<T>::relate(const LineString<U>& o) const { return detail::geos_relate(geos_ring_.get(), o.geos_linestring_.get()); } \
+template <typename T> std::string LinearRing<T>::relate(const LinearRing& o) const { return detail::geos_relate(geos_ring_.get(), o.geos_ring_.get()); } \
+template <typename T> template <typename U> bool LinearRing<T>::relate_pattern(const Point<U>& o, const std::string& p) const { return detail::geos_relate_pattern(geos_ring_.get(), o.geos_point_.get(), p); } \
+template <typename T> template <typename U> bool LinearRing<T>::relate_pattern(const LineString<U>& o, const std::string& p) const { return detail::geos_relate_pattern(geos_ring_.get(), o.geos_linestring_.get(), p); } \
+template <typename T> bool LinearRing<T>::relate_pattern(const LinearRing& o, const std::string& p) const { return detail::geos_relate_pattern(geos_ring_.get(), o.geos_ring_.get(), p); }
+LR_RELATE_IMPL
+#undef LR_RELATE_IMPL
+
+// -- hausdorff_distance -----------
+
+template <typename T> template <typename U>
+double LinearRing<T>::hausdorff_distance(const Point<U>& o) const { return detail::geos_hausdorff_distance(geos_ring_.get(), o.geos_point_.get()); }
+template <typename T> template <typename U>
+double LinearRing<T>::hausdorff_distance(const LineString<U>& o) const { return detail::geos_hausdorff_distance(geos_ring_.get(), o.geos_linestring_.get()); }
+template <typename T>
+double LinearRing<T>::hausdorff_distance(const LinearRing& o) const { return detail::geos_hausdorff_distance(geos_ring_.get(), o.geos_ring_.get()); }
+
+// -- Constructive operations -----------
+
+#define LR_CONSTRUCT(OP, GEOS_FN) \
+template <typename T> std::string LinearRing<T>::OP(const LinearRing& o) const { \
+    auto res = detail::GEOS_FN(geos_ring_.get(), o.geos_ring_.get()); \
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY"; \
+} \
+template <typename T> template <typename U> std::string LinearRing<T>::OP(const Point<U>& o) const { \
+    auto res = detail::GEOS_FN(geos_ring_.get(), o.geos_point_.get()); \
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY"; \
+} \
+template <typename T> template <typename U> std::string LinearRing<T>::OP(const LineString<U>& o) const { \
+    auto res = detail::GEOS_FN(geos_ring_.get(), o.geos_linestring_.get()); \
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY"; \
+}
+LR_CONSTRUCT(difference,       geos_difference)
+LR_CONSTRUCT(intersection,     geos_intersection)
+LR_CONSTRUCT(union_op,         geos_union)
+LR_CONSTRUCT(symmetric_difference, geos_sym_difference)
+#undef LR_CONSTRUCT
+
+template <typename T>
+std::string LinearRing<T>::simplify(double tol) const {
+    auto res = detail::geos_simplify(geos_ring_.get(), tol);
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+
+// -- project / interpolate -----------
+
+template <typename T> template <typename U>
+double LinearRing<T>::project(const Point<U>& o) const {
+    geos::linearref::LengthIndexedLine lil(geos_ring_.get());
+    return lil.project(geos::geom::Coordinate(static_cast<double>(o.x), static_cast<double>(o.y)));
+}
+
+template <typename T>
+Point<double> LinearRing<T>::interpolate(double distance) const {
+    geos::linearref::LengthIndexedLine lil(geos_ring_.get());
+    auto c = lil.extractPoint(distance);
+    return Point<double>(c.x, c.y);
+}
+
+// -- parallel_offset -----------
+
+template <typename T>
+std::string LinearRing<T>::parallel_offset(double distance, int quad_segs) const {
+    auto res = detail::geos_parallel_offset(geos_ring_.get(), distance, quad_segs);
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+
+// -- convex_hull / envelope / representative_point -----------
+
+template <typename T>
+Polygon<double> LinearRing<T>::convex_hull() const {
+    auto res = detail::geos_convex_hull(geos_ring_.get());
+    if (!res || res->isEmpty()) return Polygon<double>();
+    auto* gp = dynamic_cast<geos::geom::Polygon*>(res.get());
+    if (!gp) return Polygon<double>();
+    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
+    if (!cs || cs->isEmpty()) return Polygon<double>();
+    size_t n = cs->getSize();
+    std::vector<double> c(n*2);
+    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
+    return Polygon<double>(c.data(), n, 2);
+}
+
+template <typename T>
+Polygon<double> LinearRing<T>::envelope() const {
+    auto res = detail::geos_envelope(geos_ring_.get());
+    if (!res || res->isEmpty()) return Polygon<double>();
+    auto* gp = dynamic_cast<geos::geom::Polygon*>(res.get());
+    if (!gp) return Polygon<double>();
+    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
+    if (!cs || cs->isEmpty()) return Polygon<double>();
+    size_t n = cs->getSize();
+    std::vector<double> c(n*2);
+    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
+    return Polygon<double>(c.data(), n, 2);
+}
+
+template <typename T>
+Point<double> LinearRing<T>::representative_point() const {
+    auto res = detail::geos_representative_point(geos_ring_.get());
+    if (!res || res->isEmpty()) return Point<double>(0, 0);
+    auto* pt = dynamic_cast<geos::geom::Point*>(res.get());
+    if (!pt) return Point<double>(0, 0);
+    return Point<double>(pt->getX(), pt->getY());
+}
+
+// -- minimum_clearance -----------
+
+template <typename T>
+double LinearRing<T>::minimum_clearance() const {
+    return detail::geos_minimum_clearance(geos_ring_.get());
+}
 
 // ============================================================================
 // Polygon implementation
@@ -507,6 +796,8 @@ template <typename T> bool        Polygon<T>::has_z() const { return detail::geo
 template <typename T> bool   Polygon<T>::is_empty() const { return detail::geos_is_empty(geos_polygon_.get()); }
 template <typename T> bool   Polygon<T>::is_simple() const { return detail::geos_is_simple(geos_polygon_.get()); }
 template <typename T> bool   Polygon<T>::is_valid() const { return geos_polygon_->isEmpty() ? false : geos_polygon_->isValid(); }
+template <typename T> bool   Polygon<T>::is_closed() const { return true; }
+template <typename T> bool   Polygon<T>::is_ring()   const { return false; }
 template <typename T> double Polygon<T>::length() const { return geos_polygon_->getLength(); }
 template <typename T> std::vector<double> Polygon<T>::bounds() const { return detail::geos_bounds(geos_polygon_.get()); }
 
@@ -589,7 +880,7 @@ Polygon<double> Polygon<T>::OP(const Polygon<double>& o) const { \
 }
 POLY_CONSTRUCT(difference,       geos_difference)
 POLY_CONSTRUCT(union_op,         geos_union)
-POLY_CONSTRUCT(sym_difference,   geos_sym_difference)
+POLY_CONSTRUCT(symmetric_difference,   geos_sym_difference)
 #undef POLY_CONSTRUCT
 
 // Python: shapely/geometry/base.py::simplify:L469
@@ -681,6 +972,24 @@ template <typename T>
 std::tuple<std::vector<double>, std::vector<double>> Polygon<T>::xy() const {
     auto ext = exterior();
     return ext.xy();
+}
+
+// Python: shapely/geometry/base.py::minimum_clearance:L734
+template <typename T>
+double Polygon<T>::minimum_clearance() const {
+    return detail::geos_minimum_clearance(geos_polygon_.get());
+}
+
+// Python: shapely/geometry/base.py::project:L900
+template <typename T> template <typename U>
+double Polygon<T>::project(const Point<U>& o) const {
+    return geos_polygon_->getLength() > 0 ? 0.0 : 0.0;
+}
+
+// Python: shapely/geometry/base.py::interpolate:L915
+template <typename T>
+Point<double> Polygon<T>::interpolate(double distance) const {
+    return centroid();
 }
 
 // Python: shapely/geometry/base.py::normalize:L663

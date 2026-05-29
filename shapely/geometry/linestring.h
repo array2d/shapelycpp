@@ -119,6 +119,19 @@ public:
     Point<double> interpolate(double distance) const;
     Point<double> centroid() const;
     Polygon<double> buffer(double distance) const;
+
+    // -- Boundary (Python: .boundary) --
+    std::string boundary() const;
+
+    // -- Minimum clearance (Python: .minimum_clearance) --
+    double minimum_clearance() const;
+
+    // -- Envelope (Python: .envelope) --
+    Polygon<double> envelope() const;
+
+    // -- Representative point (Python: .representative_point) --
+    Point<double> representative_point() const;
+
     void normalize();
 
     // -- Constructive operations (Python: difference, union, intersection, sym_difference) --
@@ -131,9 +144,9 @@ public:
     std::string union_op(const LineString& other) const;
     template <typename U> std::string union_op(const Point<U>& other) const;
     template <typename U> std::string union_op(const Polygon<U>& other) const;
-    std::string sym_difference(const LineString& other) const;
-    template <typename U> std::string sym_difference(const Point<U>& other) const;
-    template <typename U> std::string sym_difference(const Polygon<U>& other) const;
+    std::string symmetric_difference(const LineString& other) const;
+    template <typename U> std::string symmetric_difference(const Point<U>& other) const;
+    template <typename U> std::string symmetric_difference(const Polygon<U>& other) const;
     std::string simplify(double tolerance) const;
     std::string parallel_offset(double distance, int quad_segs = 16) const;
     Polygon<double> convex_hull() const;
@@ -372,7 +385,7 @@ template <typename T> template <typename U> std::string LineString<T>::OP(const 
 LS_CONSTRUCT(difference,       geos_difference)
 LS_CONSTRUCT(intersection,     geos_intersection)
 LS_CONSTRUCT(union_op,         geos_union)
-LS_CONSTRUCT(sym_difference,   geos_sym_difference)
+LS_CONSTRUCT(symmetric_difference,   geos_sym_difference)
 #undef LS_CONSTRUCT
 
 // Python: base.py::simplify:L469
@@ -402,6 +415,44 @@ Polygon<double> LineString<T>::convex_hull() const {
     std::vector<double> c(n*2);
     for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
     return Polygon<double>(c.data(), n, 2);
+}
+
+// Python: shapely/geometry/base.py::boundary:L457
+template <typename T>
+std::string LineString<T>::boundary() const {
+    auto res = detail::geos_boundary(geos_linestring_.get());
+    return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
+}
+
+// Python: shapely/geometry/base.py::minimum_clearance:L734
+template <typename T>
+double LineString<T>::minimum_clearance() const {
+    return detail::geos_minimum_clearance(geos_linestring_.get());
+}
+
+// Python: shapely/geometry/base.py::envelope:L742
+template <typename T>
+Polygon<double> LineString<T>::envelope() const {
+    auto res = detail::geos_envelope(geos_linestring_.get());
+    if (!res || res->isEmpty()) return Polygon<double>();
+    auto* gp = dynamic_cast<geos::geom::Polygon*>(res.get());
+    if (!gp) return Polygon<double>();
+    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
+    if (!cs || cs->isEmpty()) return Polygon<double>();
+    size_t n = cs->getSize();
+    std::vector<double> c(n*2);
+    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
+    return Polygon<double>(c.data(), n, 2);
+}
+
+// Python: shapely/geometry/base.py::representative_point:L877
+template <typename T>
+Point<double> LineString<T>::representative_point() const {
+    auto res = detail::geos_representative_point(geos_linestring_.get());
+    if (!res || res->isEmpty()) return Point<double>(0, 0);
+    auto* pt = dynamic_cast<geos::geom::Point*>(res.get());
+    if (!pt) return Point<double>(0, 0);
+    return Point<double>(pt->getX(), pt->getY());
 }
 
 // Python: base.py::normalize:L663

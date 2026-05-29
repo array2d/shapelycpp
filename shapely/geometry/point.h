@@ -43,6 +43,12 @@ public:
     // -- Buffer (Python: buffer) --
     Polygon<double> buffer(double distance) const;
 
+    // -- Boundary (Python: .boundary) --
+    std::string boundary() const;
+
+    // -- Minimum clearance (Python: .minimum_clearance) --
+    double minimum_clearance() const;
+
     // -- Predicates (Python: contains, within, ...) --
     template <typename U> bool contains(const Point<U>& other) const;
     template <typename U> bool contains(const LineString<U>& other) const;
@@ -103,6 +109,8 @@ public:
     bool is_empty() const;
     bool is_simple() const;
     bool is_valid() const;
+    bool is_closed() const;
+    bool is_ring() const;
     double area() const;
     double length() const;
     std::vector<double> bounds() const;
@@ -117,9 +125,9 @@ public:
     Point<double> union_op(const Point& other) const;
     template <typename U> std::string union_op(const LineString<U>& other) const;
     template <typename U> std::string union_op(const Polygon<U>& other) const;
-    Point<double> sym_difference(const Point& other) const;
-    template <typename U> std::string sym_difference(const LineString<U>& other) const;
-    template <typename U> std::string sym_difference(const Polygon<U>& other) const;
+    Point<double> symmetric_difference(const Point& other) const;
+    template <typename U> std::string symmetric_difference(const LineString<U>& other) const;
+    template <typename U> std::string symmetric_difference(const Polygon<U>& other) const;
     Point<double> simplify(double tolerance) const;
 
     // -- Topology (Python: convex_hull, boundary, envelope, representative_point) --
@@ -228,6 +236,19 @@ Polygon<double> Point<T>::buffer(double distance) const {
     std::vector<double> c(n * 2);
     for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
     return Polygon<double>(c.data(), n, 2);
+}
+
+// Python: shapely/geometry/base.py::boundary:L457
+template <typename T>
+std::string Point<T>::boundary() const {
+    // Point has no boundary — returns empty geometry
+    return "GEOMETRYCOLLECTION EMPTY";
+}
+
+// Python: shapely/geometry/base.py::minimum_clearance:L734
+template <typename T>
+double Point<T>::minimum_clearance() const {
+    return detail::geos_minimum_clearance(geos_point_.get());
 }
 
 // Python: shapely/geometry/base.py predicates L753-L813
@@ -391,7 +412,7 @@ std::string Point<T>::union_op(const Polygon<U>& o) const {
 }
 
 template <typename T>
-Point<double> Point<T>::sym_difference(const Point& o) const {
+Point<double> Point<T>::symmetric_difference(const Point& o) const {
     auto res = detail::geos_sym_difference(geos_point_.get(), o.geos_point_.get());
     if (!res || res->isEmpty()) return Point<double>(0, 0);
     auto* mpt = dynamic_cast<geos::geom::MultiPoint*>(res.get());
@@ -404,12 +425,12 @@ Point<double> Point<T>::sym_difference(const Point& o) const {
     return Point<double>(0, 0);
 }
 template <typename T> template <typename U>
-std::string Point<T>::sym_difference(const LineString<U>& o) const {
+std::string Point<T>::symmetric_difference(const LineString<U>& o) const {
     auto res = detail::geos_sym_difference(geos_point_.get(), o.geos_linestring_.get());
     return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
 }
 template <typename T> template <typename U>
-std::string Point<T>::sym_difference(const Polygon<U>& o) const {
+std::string Point<T>::symmetric_difference(const Polygon<U>& o) const {
     auto res = detail::geos_sym_difference(geos_point_.get(), o.geos_polygon_.get());
     return res ? detail::geos_to_wkt(res.get()) : "GEOMETRYCOLLECTION EMPTY";
 }

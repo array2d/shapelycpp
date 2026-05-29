@@ -96,7 +96,7 @@ public:
     MultiLineString<double> difference(const MultiLineString<double>& other) const;
     MultiLineString<double> intersection(const MultiLineString<double>& other) const;
     MultiLineString<double> union_op(const MultiLineString<double>& other) const;
-    MultiLineString<double> sym_difference(const MultiLineString<double>& other) const;
+    MultiLineString<double> symmetric_difference(const MultiLineString<double>& other) const;
     MultiLineString<double> simplify(double tolerance) const;
 
     // -- Accessors --
@@ -332,7 +332,7 @@ MultiLineString<double> MultiLineString<T>::union_op(const MultiLineString<doubl
     return MultiLineString<double>();
 }
 template <typename T>
-MultiLineString<double> MultiLineString<T>::sym_difference(const MultiLineString<double>& o) const {
+MultiLineString<double> MultiLineString<T>::symmetric_difference(const MultiLineString<double>& o) const {
     auto res = detail::geos_sym_difference(geos_mls_.get(), o.geos_mls_.get());
     if (!res || res->isEmpty()) return MultiLineString<double>();
     auto* mls = dynamic_cast<geos::geom::MultiLineString*>(res.get());
