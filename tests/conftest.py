@@ -72,7 +72,11 @@ def make(cpp, request):
             'point': lambda x, y: cpp.point(float(x), float(y)),
             'linestring': lambda coords: cpp.linestring(np.array(coords, dtype=np.float64)),
             'polygon': lambda coords: cpp.polygon(np.array(coords, dtype=np.float64)),
+            'multipoint': lambda coords: cpp.multipoint(np.array(coords, dtype=np.float64)),
+            'multilinestring': lambda lines: cpp.multilinestring([np.array(l, dtype=np.float64) for l in lines]),
+            'multipolygon': lambda polys: cpp.multipolygon([np.array(p, dtype=np.float64) for p in polys]),
             'Point': cpp.Point, 'LineString': cpp.LineString, 'Polygon': cpp.Polygon,
+            'MultiPoint': cpp.MultiPoint, 'MultiLineString': cpp.MultiLineString, 'MultiPolygon': cpp.MultiPolygon,
             'dtype': np.float64,
         }
     else:
@@ -80,7 +84,11 @@ def make(cpp, request):
             'point': lambda x, y: cpp.point(np.array([x, y], dtype=np.float32)),
             'linestring': lambda coords: cpp.linestring(np.array(coords, dtype=np.float32)),
             'polygon': lambda coords: cpp.polygon(np.array(coords, dtype=np.float32)),
+            'multipoint': lambda coords: cpp.multipoint(np.array(coords, dtype=np.float32)),
+            'multilinestring': lambda lines: cpp.multilinestring([np.array(l, dtype=np.float32) for l in lines]),
+            'multipolygon': lambda polys: cpp.multipolygon([np.array(p, dtype=np.float32) for p in polys]),
             'Point': cpp.PointF32, 'LineString': cpp.LineStringF32, 'Polygon': cpp.PolygonF32,
+            'MultiPoint': cpp.MultiPoint, 'MultiLineString': cpp.MultiLineString, 'MultiPolygon': cpp.MultiPolygon,
             'dtype': np.float32,
         }
 
@@ -103,6 +111,18 @@ class CppFactory:
         return self.m.polygon(np.array(coords, dtype=np.float64))
     def linearring(self, coords):
         return self.m.linearring(np.array(coords, dtype=np.float64))
+    def multipoint(self, coords, dtype='double'):
+        if dtype == 'float32':
+            return self.m.multipoint(np.array(coords, dtype=np.float32))
+        return self.m.multipoint(np.array(coords, dtype=np.float64))
+    def multilinestring(self, lines, dtype='double'):
+        if dtype == 'float32':
+            return self.m.multilinestring([np.array(l, dtype=np.float32) for l in lines])
+        return self.m.multilinestring([np.array(l, dtype=np.float64) for l in lines])
+    def multipolygon(self, polys, dtype='double'):
+        if dtype == 'float32':
+            return self.m.multipolygon([np.array(p, dtype=np.float32) for p in polys])
+        return self.m.multipolygon([np.array(p, dtype=np.float64) for p in polys])
 
 @pytest.fixture(scope='session')
 def C(cpp):

@@ -16,6 +16,10 @@
 #include "../shapely/geometry/point.h"
 #include "../shapely/geometry/linestring.h"
 #include "../shapely/geometry/polygon.h"
+#include "../shapely/geometry/multipoint.h"
+#include "../shapely/geometry/multilinestring.h"
+#include "../shapely/geometry/multipolygon.h"
+#include "../shapely/geometry/geometrycollection.h"
 
 #include <cstring>
 #include <tuple>
@@ -82,6 +86,52 @@ inline Polygon<float> polygon(const py::array_t<float>& arr) {
 inline LinearRing<double> linearring(const py::array_t<double>& arr) {
     auto buf = arr.request();
     return LinearRing<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
+}
+
+// -- MultiPoint: single array of shape (n_pts, 2) --
+inline MultiPoint<double> multipoint(const py::array_t<double>& arr) {
+    auto buf = arr.request();
+    return MultiPoint<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
+}
+inline MultiPoint<float> multipoint(const py::array_t<float>& arr) {
+    auto buf = arr.request();
+    return MultiPoint<float>(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
+}
+
+// -- MultiLineString: vector of arrays, each (n_rows, 2); dtype distinguishes overload --
+inline MultiLineString<double> multilinestring(const std::vector<py::array_t<double>>& arrays) {
+    MultiLineString<double> mls;
+    for (auto& arr : arrays) {
+        auto buf = arr.request();
+        mls.add_line(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
+    }
+    return mls;
+}
+inline MultiLineString<float> multilinestring(const std::vector<py::array_t<float>>& arrays) {
+    MultiLineString<float> mls;
+    for (auto& arr : arrays) {
+        auto buf = arr.request();
+        mls.add_line(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
+    }
+    return mls;
+}
+
+// -- MultiPolygon: vector of arrays, each (n_rows, 2); dtype distinguishes overload --
+inline MultiPolygon<double> multipolygon(const std::vector<py::array_t<double>>& arrays) {
+    MultiPolygon<double> mp;
+    for (auto& arr : arrays) {
+        auto buf = arr.request();
+        mp.add_polygon(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
+    }
+    return mp;
+}
+inline MultiPolygon<float> multipolygon(const std::vector<py::array_t<float>>& arrays) {
+    MultiPolygon<float> mp;
+    for (auto& arr : arrays) {
+        auto buf = arr.request();
+        mp.add_polygon(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
+    }
+    return mp;
 }
 
 // ============================================================================

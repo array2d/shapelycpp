@@ -155,6 +155,9 @@ private:
     template <typename U> friend class Polygon;
     template <typename U> friend class Point;
     template <typename U> friend class LinearRing;
+    template <typename U> friend class MultiPoint;
+    template <typename U> friend class MultiLineString;
+    template <typename U> friend class MultiPolygon;
     std::vector<T> coords_;
     size_t rows_ = 0, cols_ = 0;
     std::unique_ptr<geos::geom::LineString> geos_linestring_;

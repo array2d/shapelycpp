@@ -160,9 +160,8 @@ MultiPoint<T>::MultiPoint(const T* coords, size_t n_pts, size_t dims)
     factory_ = geos::geom::GeometryFactory::create();
     std::vector<std::unique_ptr<geos::geom::Geometry>> pts;
     for (size_t i = 0; i < n_pts; ++i) {
-        auto pt = factory_->createPoint(geos::geom::Coordinate(
-            static_cast<double>(coords_[i*dims]), static_cast<double>(coords_[i*dims+1])));
-        pts.push_back(std::move(pt));
+        pts.emplace_back(factory_->createPoint(geos::geom::Coordinate(
+            static_cast<double>(coords_[i*dims]), static_cast<double>(coords_[i*dims+1]))));
     }
     geos_multipoint_ = factory_->createMultiPoint(std::move(pts));
 }

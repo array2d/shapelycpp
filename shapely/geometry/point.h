@@ -143,6 +143,9 @@ private:
     template <typename U> friend class LineString;
     template <typename U> friend class Polygon;
     template <typename U> friend class Point;
+    template <typename U> friend class MultiPoint;
+    template <typename U> friend class MultiLineString;
+    template <typename U> friend class MultiPolygon;
     std::unique_ptr<geos::geom::Point> geos_point_;
     geos::geom::GeometryFactory::Ptr factory_;
 };

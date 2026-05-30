@@ -165,6 +165,133 @@ PYBIND11_MODULE(shapelycpp, m) {
         .def("is_ccw",    &LinearRing<double>::is_ccw)
         BIND_ACCESSORS(LinearRing<double>);
 
+    // -- Multi* factories (multipoint overloads by array dtype; multilinestring/multipolygon by vector<array_t<T>>) --
+    m.def("multipoint", py::overload_cast<const py::array_t<double>&>(&multipoint), py::arg("coords"));
+    m.def("multipoint", py::overload_cast<const py::array_t<float>&>(&multipoint),  py::arg("coords"));
+    m.def("multilinestring", py::overload_cast<const std::vector<py::array_t<double>>&>(&multilinestring), py::arg("lines"));
+    m.def("multilinestring", py::overload_cast<const std::vector<py::array_t<float>>&>(&multilinestring),  py::arg("lines"));
+    m.def("multipolygon", py::overload_cast<const std::vector<py::array_t<double>>&>(&multipolygon), py::arg("polygons"));
+    m.def("multipolygon", py::overload_cast<const std::vector<py::array_t<float>>&>(&multipolygon),  py::arg("polygons"));
+
+    // ======================================================================
+    // MultiPoint<double> — full API
+    // ======================================================================
+    py::class_<MultiPoint<double>>(m, "MultiPoint")
+        .def(py::init([](const py::array_t<double>& arr) {
+            auto buf = arr.request();
+            return new MultiPoint<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
+        }), py::arg("coords"))
+        .def("num_geometries", &MultiPoint<double>::num_geometries)
+        .def("geometry_n", &MultiPoint<double>::geometry_n)
+        .def("distance", [](const MultiPoint<double>& self, const Point<double>& o) {
+            return self.distance(o);
+        })
+        .def("distance", [](const MultiPoint<double>& self, const MultiPoint<double>& o) {
+            return self.distance(o);
+        })
+        .def("intersects", [](const MultiPoint<double>& self, const Point<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const MultiPoint<double>& self, const MultiPoint<double>& o) {
+            return self.intersects(o);
+        })
+        BIND_ACCESSORS(MultiPoint<double>);
+
+    // ======================================================================
+    // MultiLineString<double> — full API
+    // ======================================================================
+    py::class_<MultiLineString<double>>(m, "MultiLineString")
+        .def(py::init([](const std::vector<py::array_t<double>>& arrays) {
+            auto* mls = new MultiLineString<double>();
+            for (auto& arr : arrays) {
+                auto buf = arr.request();
+                mls->add_line(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
+            }
+            return mls;
+        }), py::arg("lines"))
+        .def("num_geometries", &MultiLineString<double>::num_geometries)
+        .def("geometry_n", &MultiLineString<double>::geometry_n)
+        .def("add_line", [](MultiLineString<double>& self, const py::array_t<double>& arr) {
+            auto buf = arr.request();
+            self.add_line(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
+        })
+        .def("distance", [](const MultiLineString<double>& self, const Point<double>& o) {
+            return self.distance(o);
+        })
+        .def("distance", [](const MultiLineString<double>& self, const LineString<double>& o) {
+            return self.distance(o);
+        })
+        .def("distance", [](const MultiLineString<double>& self, const MultiLineString<double>& o) {
+            return self.distance(o);
+        })
+        .def("intersects", [](const MultiLineString<double>& self, const Point<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const MultiLineString<double>& self, const LineString<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const MultiLineString<double>& self, const MultiLineString<double>& o) {
+            return self.intersects(o);
+        })
+        BIND_ACCESSORS(MultiLineString<double>);
+
+    // ======================================================================
+    // MultiPolygon<double> — full API
+    // ======================================================================
+    py::class_<MultiPolygon<double>>(m, "MultiPolygon")
+        .def(py::init([](const std::vector<py::array_t<double>>& arrays) {
+            auto* mp = new MultiPolygon<double>();
+            for (auto& arr : arrays) {
+                auto buf = arr.request();
+                mp->add_polygon(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
+            }
+            return mp;
+        }), py::arg("polygons"))
+        .def("num_geometries", &MultiPolygon<double>::num_geometries)
+        .def("geometry_n", &MultiPolygon<double>::geometry_n)
+        .def("add_polygon", [](MultiPolygon<double>& self, const py::array_t<double>& arr) {
+            auto buf = arr.request();
+            self.add_polygon(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
+        })
+        .def("distance", [](const MultiPolygon<double>& self, const Point<double>& o) {
+            return self.distance(o);
+        })
+        .def("distance", [](const MultiPolygon<double>& self, const LineString<double>& o) {
+            return self.distance(o);
+        })
+        .def("distance", [](const MultiPolygon<double>& self, const Polygon<double>& o) {
+            return self.distance(o);
+        })
+        .def("distance", [](const MultiPolygon<double>& self, const MultiPolygon<double>& o) {
+            return self.distance(o);
+        })
+        .def("intersects", [](const MultiPolygon<double>& self, const Point<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const MultiPolygon<double>& self, const LineString<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const MultiPolygon<double>& self, const Polygon<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const MultiPolygon<double>& self, const MultiPolygon<double>& o) {
+            return self.intersects(o);
+        })
+        BIND_ACCESSORS(MultiPolygon<double>);
+
+    // ======================================================================
+    // GeometryCollection — basic API
+    // ======================================================================
+    py::class_<GeometryCollection>(m, "GeometryCollection")
+        .def(py::init<>())
+        .def("num_geometries", &GeometryCollection::num_geometries)
+        .def("is_empty", &GeometryCollection::is_empty)
+        .def("area", &GeometryCollection::area)
+        .def("length", &GeometryCollection::length)
+        .def("wkt", &GeometryCollection::wkt)
+        .def("buffer", &GeometryCollection::buffer)
+        .def("normalize", &GeometryCollection::normalize);
+
     // ======================================================================
     // Cross-type predicates (via pycpp macros)
     // ======================================================================
