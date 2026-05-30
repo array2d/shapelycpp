@@ -34,13 +34,17 @@ PYBIND11_MODULE(shapelycpp, m) {
     m.def("point", py::overload_cast<double, double>(&point), py::arg("x"), py::arg("y"));
     m.def("point", py::overload_cast<const py::array_t<double>&>(&point), py::arg("coords"));
     m.def("point", py::overload_cast<const py::array_t<float>&>(&point),  py::arg("coords"));
+    m.def("point", py::overload_cast<const py::array&>(&point), py::arg("coords"));       // auto-double
 
     // linestring / polygon / linearring: array dtype selects f64 or f32
     m.def("linestring", py::overload_cast<const py::array_t<double>&>(&linestring), py::arg("coords"));
     m.def("linestring", py::overload_cast<const py::array_t<float>&>(&linestring),  py::arg("coords"));
+    m.def("linestring", py::overload_cast<const py::array&>(&linestring),  py::arg("coords"));    // auto-double
     m.def("polygon",    py::overload_cast<const py::array_t<double>&>(&polygon),    py::arg("coords"));
     m.def("polygon",    py::overload_cast<const py::array_t<float>&>(&polygon),     py::arg("coords"));
+    m.def("polygon",    py::overload_cast<const py::array&>(&polygon),     py::arg("coords"));    // auto-double
     m.def("linearring", py::overload_cast<const py::array_t<double>&>(&linearring), py::arg("coords"));
+    m.def("linearring", py::overload_cast<const py::array&>(&linearring), py::arg("coords"));     // auto-double
 
     // ======================================================================
     // Point<double> — full API
@@ -177,10 +181,13 @@ PYBIND11_MODULE(shapelycpp, m) {
     // -- Multi* factories (multipoint overloads by array dtype; multilinestring/multipolygon by vector<array_t<T>>) --
     m.def("multipoint", py::overload_cast<const py::array_t<double>&>(&multipoint), py::arg("coords"));
     m.def("multipoint", py::overload_cast<const py::array_t<float>&>(&multipoint),  py::arg("coords"));
+    m.def("multipoint", py::overload_cast<const py::array&>(&multipoint),  py::arg("coords"));   // auto-double
     m.def("multilinestring", py::overload_cast<const std::vector<py::array_t<double>>&>(&multilinestring), py::arg("lines"));
     m.def("multilinestring", py::overload_cast<const std::vector<py::array_t<float>>&>(&multilinestring),  py::arg("lines"));
+    m.def("multilinestring", py::overload_cast<const std::vector<py::array>&>(&multilinestring),  py::arg("lines")); // auto-double
     m.def("multipolygon", py::overload_cast<const std::vector<py::array_t<double>>&>(&multipolygon), py::arg("polygons"));
     m.def("multipolygon", py::overload_cast<const std::vector<py::array_t<float>>&>(&multipolygon),  py::arg("polygons"));
+    m.def("multipolygon", py::overload_cast<const std::vector<py::array>&>(&multipolygon),  py::arg("polygons")); // auto-double
 
     // ======================================================================
     // MultiPoint<double> — full API

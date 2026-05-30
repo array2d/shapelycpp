@@ -43,6 +43,25 @@ py::array_t<T> native_to_array(const T* data, size_t rows, size_t cols) {
     return result;
 }
 
+/// Convert any py::array coordinate buffer to std::vector<double>.
+/// dtype double → direct copy; float32/other → cast & widen to double.
+inline std::vector<double> array_to_double_vec(const py::array& arr) {
+    auto buf = arr.request();
+    size_t sz = static_cast<size_t>(buf.shape[0]) * 2;
+    std::vector<double> tmp(sz);
+    if (arr.dtype().is(py::dtype::of<double>())) {
+        const double* src = static_cast<const double*>(buf.ptr);
+        std::copy(src, src + sz, tmp.begin());
+    } else {
+        // float32 or other → cast through pybind11 to float32, then widen
+        auto f32 = py::cast<py::array_t<float>>(arr);
+        auto fbuf = f32.request();
+        const float* src = static_cast<const float*>(fbuf.ptr);
+        for (size_t i = 0; i < sz; ++i) tmp[i] = static_cast<double>(src[i]);
+    }
+    return tmp;
+}
+
 // ============================================================================
 // Factory functions — all overloaded, no _f32 suffixes
 // ============================================================================
@@ -61,6 +80,11 @@ inline Point<float> point(const py::array_t<float>& arr) {
     const float* p = static_cast<const float*>(buf.ptr);
     return Point<float>(buf.size > 0 ? p[0] : 0, buf.size > 1 ? p[1] : 0);
 }
+// auto-double: accept any dtype (int, unknown), always produce Point<double>
+inline Point<double> point(const py::array& arr) {
+    auto tmp = array_to_double_vec(arr);
+    return Point<double>(tmp[0], tmp[1]);
+}
 
 // -- LineString --
 inline LineString<double> linestring(const py::array_t<double>& arr) {
@@ -70,6 +94,11 @@ inline LineString<double> linestring(const py::array_t<double>& arr) {
 inline LineString<float> linestring(const py::array_t<float>& arr) {
     auto buf = arr.request();
     return LineString<float>(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
+}
+inline LineString<double> linestring(const py::array& arr) {
+    py::ssize_t n = arr.request().shape[0];
+    auto tmp = array_to_double_vec(arr);
+    return LineString<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 
 // -- Polygon --
@@ -81,11 +110,21 @@ inline Polygon<float> polygon(const py::array_t<float>& arr) {
     auto buf = arr.request();
     return Polygon<float>(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
+inline Polygon<double> polygon(const py::array& arr) {
+    py::ssize_t n = arr.request().shape[0];
+    auto tmp = array_to_double_vec(arr);
+    return Polygon<double>(tmp.data(), static_cast<size_t>(n), 2);
+}
 
 // -- LinearRing (double only for now) --
 inline LinearRing<double> linearring(const py::array_t<double>& arr) {
     auto buf = arr.request();
     return LinearRing<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
+}
+inline LinearRing<double> linearring(const py::array& arr) {
+    py::ssize_t n = arr.request().shape[0];
+    auto tmp = array_to_double_vec(arr);
+    return LinearRing<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 
 // -- MultiPoint: single array of shape (n_pts, 2) --
@@ -96,6 +135,11 @@ inline MultiPoint<double> multipoint(const py::array_t<double>& arr) {
 inline MultiPoint<float> multipoint(const py::array_t<float>& arr) {
     auto buf = arr.request();
     return MultiPoint<float>(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
+}
+inline MultiPoint<double> multipoint(const py::array& arr) {
+    py::ssize_t n = arr.request().shape[0];
+    auto tmp = array_to_double_vec(arr);
+    return MultiPoint<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 
 // -- MultiLineString: vector of arrays, each (n_rows, 2); dtype distinguishes overload --
@@ -115,6 +159,15 @@ inline MultiLineString<float> multilinestring(const std::vector<py::array_t<floa
     }
     return mls;
 }
+inline MultiLineString<double> multilinestring(const std::vector<py::array>& arrays) {
+    MultiLineString<double> mls;
+    for (auto& arr : arrays) {
+        py::ssize_t n = arr.request().shape[0];
+        auto tmp = array_to_double_vec(arr);
+        mls.add_line(tmp.data(), static_cast<size_t>(n), 2);
+    }
+    return mls;
+}
 
 // -- MultiPolygon: vector of arrays, each (n_rows, 2); dtype distinguishes overload --
 inline MultiPolygon<double> multipolygon(const std::vector<py::array_t<double>>& arrays) {
@@ -130,6 +183,15 @@ inline MultiPolygon<float> multipolygon(const std::vector<py::array_t<float>>& a
     for (auto& arr : arrays) {
         auto buf = arr.request();
         mp.add_polygon(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
+    }
+    return mp;
+}
+inline MultiPolygon<double> multipolygon(const std::vector<py::array>& arrays) {
+    MultiPolygon<double> mp;
+    for (auto& arr : arrays) {
+        py::ssize_t n = arr.request().shape[0];
+        auto tmp = array_to_double_vec(arr);
+        mp.add_polygon(tmp.data(), static_cast<size_t>(n), 2);
     }
     return mp;
 }
