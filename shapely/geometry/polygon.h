@@ -24,6 +24,9 @@ template <typename T> class LineString;
 #ifndef SHAPELY_GEOMETRY_POINT_DEFINED
 template <typename T> class Point;
 #endif
+#ifndef SHAPELY_GEOMETRY_POLYGON_DEFINED
+template <typename T> class Polygon;
+#endif
 
 // ============================================================================
 // LinearRing (Python: shapely/geometry/polygon.py L23-L107)
