@@ -26,6 +26,9 @@ template <typename T> class Point;
 #ifndef SHAPELY_GEOMETRY_LINEARRING_DEFINED
 template <typename T> class LinearRing;
 #endif
+#ifndef SHAPELY_GEOMETRY_MULTILINESTRING_DEFINED
+template <typename T> class MultiLineString;
+#endif
 
 template <typename T = double>
 class LineString {
@@ -47,6 +50,7 @@ public:
     double distance(const LineString& other) const;
     template <typename U> double distance(const Polygon<U>& other) const;
     template <typename U> double distance(const Point<U>& other) const;
+    template <typename U> double distance(const MultiLineString<U>& other) const;
 
     // -- Predicates --
     template <typename U> bool contains(const Point<U>& other) const;
@@ -175,6 +179,7 @@ private:
 
 #include "shapely/geometry/point.h"
 #include "shapely/geometry/polygon.h"
+#include "shapely/geometry/multilinestring.h"
 #include "shapely/geometry/base.h"
 
 #include <geos/geom/Point.h>
@@ -240,6 +245,10 @@ template <typename T> template <typename U>
 double LineString<T>::distance(const Point<U>& o) const {
     geos::operation::distance::DistanceOp op(geos_linestring_.get(), o.geos_point_.get());
     return op.distance();
+}
+template <typename T> template <typename U>
+double LineString<T>::distance(const MultiLineString<U>& o) const {
+    geos::operation::distance::DistanceOp op(geos_linestring_.get(), o.geos_mls_.get()); return op.distance();
 }
 
 // Python: shapely/geometry/base.py predicates L753-L813

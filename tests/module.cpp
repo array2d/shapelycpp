@@ -87,6 +87,9 @@ PYBIND11_MODULE(shapelycpp, m) {
         .def("distance", [](const LineString<double>& self, const LineString<double>& o) {
             return self.distance(o);
         })
+        .def("distance", [](const LineString<double>& self, const MultiLineString<double>& o) {
+            return self.distance(o);
+        })
         .def("intersects", [](const LineString<double>& self, const LineString<double>& o) {
             return self.intersects(o);
         })
@@ -119,6 +122,12 @@ PYBIND11_MODULE(shapelycpp, m) {
         .def("coords", &Polygon<double>::coords)
         .def("buffer", &Polygon<double>::buffer)
         .def("distance", [](const Polygon<double>& self, const Polygon<double>& o) {
+            return self.distance(o);
+        })
+        .def("distance", [](const Polygon<double>& self, const MultiLineString<double>& o) {
+            return self.distance(o);
+        })
+        .def("distance", [](const Polygon<double>& self, const MultiPolygon<double>& o) {
             return self.distance(o);
         })
         .def("intersects", [](const Polygon<double>& self, const Polygon<double>& o) {
@@ -221,6 +230,12 @@ PYBIND11_MODULE(shapelycpp, m) {
         .def("distance", [](const MultiLineString<double>& self, const LineString<double>& o) {
             return self.distance(o);
         })
+        .def("distance", [](const MultiLineString<double>& self, const Polygon<double>& o) {
+            return self.distance(o);
+        })
+        .def("distance", [](const MultiLineString<double>& self, const MultiPolygon<double>& o) {
+            return self.distance(o);
+        })
         .def("distance", [](const MultiLineString<double>& self, const MultiLineString<double>& o) {
             return self.distance(o);
         })
@@ -260,6 +275,9 @@ PYBIND11_MODULE(shapelycpp, m) {
             return self.distance(o);
         })
         .def("distance", [](const MultiPolygon<double>& self, const Polygon<double>& o) {
+            return self.distance(o);
+        })
+        .def("distance", [](const MultiPolygon<double>& self, const MultiLineString<double>& o) {
             return self.distance(o);
         })
         .def("distance", [](const MultiPolygon<double>& self, const MultiPolygon<double>& o) {

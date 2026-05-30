@@ -27,6 +27,9 @@ template <typename T> class Point;
 #ifndef SHAPELY_GEOMETRY_LINESTRING_DEFINED
 template <typename T> class LineString;
 #endif
+#ifndef SHAPELY_GEOMETRY_MULTILINESTRING_DEFINED
+template <typename T> class MultiLineString;
+#endif
 
 template <typename T = double>
 class MultiPolygon {
@@ -47,6 +50,7 @@ public:
     template <typename U> double distance(const Point<U>& other) const;
     template <typename U> double distance(const LineString<U>& other) const;
     template <typename U> double distance(const Polygon<U>& other) const;
+    template <typename U> double distance(const MultiLineString<U>& other) const;
     double distance(const MultiPolygon& other) const;
 
     // -- Predicates --
@@ -141,6 +145,7 @@ private:
     template <typename U> friend class Point;
     template <typename U> friend class LineString;
     template <typename U> friend class Polygon;
+    template <typename U> friend class MultiLineString;
     std::unique_ptr<geos::geom::MultiPolygon> geos_mp_;
     geos::geom::GeometryFactory::Ptr factory_;
 };
@@ -157,6 +162,7 @@ private:
 #include "shapely/geometry/point.h"
 #include "shapely/geometry/linestring.h"
 #include "shapely/geometry/polygon.h"
+#include "shapely/geometry/multilinestring.h"
 #include "shapely/geometry/base.h"
 #include <geos/geom/Point.h>
 #include <geos/geom/LineString.h>
@@ -224,6 +230,10 @@ double MultiPolygon<T>::distance(const Polygon<U>& o) const {
 template <typename T>
 double MultiPolygon<T>::distance(const MultiPolygon& o) const {
     geos::operation::distance::DistanceOp op(geos_mp_.get(), o.geos_mp_.get()); return op.distance();
+}
+template <typename T> template <typename U>
+double MultiPolygon<T>::distance(const MultiLineString<U>& o) const {
+    geos::operation::distance::DistanceOp op(geos_mp_.get(), o.geos_mls_.get()); return op.distance();
 }
 
 // -- Predicates (macros) ----------------------------------------------------

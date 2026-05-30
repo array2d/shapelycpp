@@ -24,6 +24,12 @@ template <typename T> class LineString;
 #ifndef SHAPELY_GEOMETRY_POINT_DEFINED
 template <typename T> class Point;
 #endif
+#ifndef SHAPELY_GEOMETRY_POLYGON_DEFINED
+template <typename T> class Polygon;
+#endif
+#ifndef SHAPELY_GEOMETRY_MULTIPOLYGON_DEFINED
+template <typename T> class MultiPolygon;
+#endif
 
 template <typename T = double>
 class MultiLineString {
@@ -43,6 +49,8 @@ public:
     // -- Distance --
     template <typename U> double distance(const Point<U>& other) const;
     template <typename U> double distance(const LineString<U>& other) const;
+    template <typename U> double distance(const Polygon<U>& other) const;
+    template <typename U> double distance(const MultiPolygon<U>& other) const;
     double distance(const MultiLineString& other) const;
 
     // -- Predicates --
@@ -125,6 +133,7 @@ private:
     template <typename U> friend class Point;
     template <typename U> friend class LineString;
     template <typename U> friend class Polygon;
+    template <typename U> friend class MultiPolygon;
     std::unique_ptr<geos::geom::MultiLineString> geos_mls_;
     geos::geom::GeometryFactory::Ptr factory_;
 };
@@ -140,6 +149,8 @@ private:
 
 #include "shapely/geometry/point.h"
 #include "shapely/geometry/linestring.h"
+#include "shapely/geometry/polygon.h"
+#include "shapely/geometry/multipolygon.h"
 #include "shapely/geometry/base.h"
 #include <geos/geom/Point.h>
 #include <geos/geom/LineString.h>
@@ -199,6 +210,14 @@ double MultiLineString<T>::distance(const LineString<U>& o) const {
 template <typename T>
 double MultiLineString<T>::distance(const MultiLineString& o) const {
     geos::operation::distance::DistanceOp op(geos_mls_.get(), o.geos_mls_.get()); return op.distance();
+}
+template <typename T> template <typename U>
+double MultiLineString<T>::distance(const Polygon<U>& o) const {
+    geos::operation::distance::DistanceOp op(geos_mls_.get(), o.geos_polygon_.get()); return op.distance();
+}
+template <typename T> template <typename U>
+double MultiLineString<T>::distance(const MultiPolygon<U>& o) const {
+    geos::operation::distance::DistanceOp op(geos_mls_.get(), o.geos_mp_.get()); return op.distance();
 }
 
 // -- Predicates (macros) ----------------------------------------------------
