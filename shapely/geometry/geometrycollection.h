@@ -94,12 +94,12 @@ private:
 namespace shapely {
 namespace geometry {
 
-GeometryCollection::GeometryCollection() {
+inline GeometryCollection::GeometryCollection() {
     factory_ = geos::geom::GeometryFactory::create();
     geos_coll_ = factory_->createGeometryCollection();
 }
 
-void GeometryCollection::add_geometry(std::unique_ptr<geos::geom::Geometry> geom) {
+inline void GeometryCollection::add_geometry(std::unique_ptr<geos::geom::Geometry> geom) {
     if (!geom) return;
     std::vector<std::unique_ptr<geos::geom::Geometry>> geoms;
     for (size_t i = 0; i < geos_coll_->getNumGeometries(); ++i)
@@ -108,15 +108,15 @@ void GeometryCollection::add_geometry(std::unique_ptr<geos::geom::Geometry> geom
     geos_coll_ = factory_->createGeometryCollection(std::move(geoms));
 }
 
-size_t GeometryCollection::num_geometries() const { return geos_coll_->getNumGeometries(); }
+inline size_t GeometryCollection::num_geometries() const { return geos_coll_->getNumGeometries(); }
 
-const geos::geom::Geometry* GeometryCollection::geometry_n(size_t i) const {
+inline const geos::geom::Geometry* GeometryCollection::geometry_n(size_t i) const {
     return geos_coll_->getGeometryN(i);
 }
 
 // -- Predicates (delegate to GEOS) -------------------------------------------
 #define GC_PRED(METHOD, GEOS_FN) \
-bool GeometryCollection::METHOD(const GeometryCollection& o) const { return detail::GEOS_FN(geos_coll_.get(), o.geos_coll_.get()); }
+inline bool GeometryCollection::METHOD(const GeometryCollection& o) const { return detail::GEOS_FN(geos_coll_.get(), o.geos_coll_.get()); }
 GC_PRED(contains,    geos_contains)
 GC_PRED(within,      geos_within)
 GC_PRED(disjoint,    geos_disjoint)
@@ -125,25 +125,25 @@ GC_PRED(touches,     geos_touches)
 GC_PRED(equals,      geos_equals)
 #undef GC_PRED
 
-bool GeometryCollection::equals_exact(const GeometryCollection& o, double tol) const {
+inline bool GeometryCollection::equals_exact(const GeometryCollection& o, double tol) const {
     return detail::geos_equals_exact(geos_coll_.get(), o.geos_coll_.get(), tol);
 }
-bool GeometryCollection::intersects(const GeometryCollection& o) const {
+inline bool GeometryCollection::intersects(const GeometryCollection& o) const {
     return geos_coll_->intersects(o.geos_coll_.get());
 }
-std::string GeometryCollection::relate(const GeometryCollection& o) const {
+inline std::string GeometryCollection::relate(const GeometryCollection& o) const {
     return detail::geos_relate(geos_coll_.get(), o.geos_coll_.get());
 }
-bool GeometryCollection::relate_pattern(const GeometryCollection& o, const std::string& p) const {
+inline bool GeometryCollection::relate_pattern(const GeometryCollection& o, const std::string& p) const {
     return detail::geos_relate_pattern(geos_coll_.get(), o.geos_coll_.get(), p);
 }
-double GeometryCollection::hausdorff_distance(const GeometryCollection& o) const {
+inline double GeometryCollection::hausdorff_distance(const GeometryCollection& o) const {
     return detail::geos_hausdorff_distance(geos_coll_.get(), o.geos_coll_.get());
 }
 
 // -- Constructive operations -----------------------------------------------
 #define GC_CONSTRUCT(OP, GEOS_FN) \
-GeometryCollection GeometryCollection::OP(const GeometryCollection& o) const { \
+inline GeometryCollection GeometryCollection::OP(const GeometryCollection& o) const { \
     auto res = detail::GEOS_FN(geos_coll_.get(), o.geos_coll_.get()); \
     GeometryCollection r; \
     if (res && !res->isEmpty()) { \
@@ -158,7 +158,7 @@ GC_CONSTRUCT(union_op,         geos_union)
 GC_CONSTRUCT(symmetric_difference,   geos_sym_difference)
 #undef GC_CONSTRUCT
 
-GeometryCollection GeometryCollection::simplify(double tol) const {
+inline GeometryCollection GeometryCollection::simplify(double tol) const {
     auto res = detail::geos_simplify(geos_coll_.get(), tol);
     GeometryCollection r;
     if (res && !res->isEmpty()) {
@@ -169,22 +169,22 @@ GeometryCollection GeometryCollection::simplify(double tol) const {
 }
 
 // -- Accessors ---------------------------------------------------------------
-std::string GeometryCollection::wkt() const { return detail::geos_to_wkt(geos_coll_.get()); }
-std::string GeometryCollection::wkb_hex() const { return detail::geos_to_wkb_hex(geos_coll_.get()); }
-std::string GeometryCollection::type() const { return "GeometryCollection"; }
-std::string GeometryCollection::geom_type() const { return detail::geos_geom_type(geos_coll_.get()); }
-bool GeometryCollection::has_z() const { return detail::geos_has_z(geos_coll_.get()); }
+inline std::string GeometryCollection::wkt() const { return detail::geos_to_wkt(geos_coll_.get()); }
+inline std::string GeometryCollection::wkb_hex() const { return detail::geos_to_wkb_hex(geos_coll_.get()); }
+inline std::string GeometryCollection::type() const { return "GeometryCollection"; }
+inline std::string GeometryCollection::geom_type() const { return detail::geos_geom_type(geos_coll_.get()); }
+inline bool GeometryCollection::has_z() const { return detail::geos_has_z(geos_coll_.get()); }
 
 // -- Properties ---------------------------------------------------------------
-bool GeometryCollection::is_empty() const { return detail::geos_is_empty(geos_coll_.get()); }
-bool GeometryCollection::is_simple() const { return detail::geos_is_simple(geos_coll_.get()); }
-bool GeometryCollection::is_valid() const { return detail::geos_is_valid(geos_coll_.get()); }
-double GeometryCollection::area() const { return geos_coll_->getArea(); }
-double GeometryCollection::length() const { return geos_coll_->getLength(); }
-std::vector<double> GeometryCollection::bounds() const { return detail::geos_bounds(geos_coll_.get()); }
+inline bool GeometryCollection::is_empty() const { return detail::geos_is_empty(geos_coll_.get()); }
+inline bool GeometryCollection::is_simple() const { return detail::geos_is_simple(geos_coll_.get()); }
+inline bool GeometryCollection::is_valid() const { return detail::geos_is_valid(geos_coll_.get()); }
+inline double GeometryCollection::area() const { return geos_coll_->getArea(); }
+inline double GeometryCollection::length() const { return geos_coll_->getLength(); }
+inline std::vector<double> GeometryCollection::bounds() const { return detail::geos_bounds(geos_coll_.get()); }
 
 // -- Topology ------------------------------------------------------------------
-GeometryCollection GeometryCollection::convex_hull() const {
+inline GeometryCollection GeometryCollection::convex_hull() const {
     auto res = detail::geos_convex_hull(geos_coll_.get());
     GeometryCollection r;
     if (res && !res->isEmpty()) {
@@ -194,7 +194,7 @@ GeometryCollection GeometryCollection::convex_hull() const {
     return r;
 }
 
-GeometryCollection GeometryCollection::buffer(double distance) const {
+inline GeometryCollection GeometryCollection::buffer(double distance) const {
     auto buf = geos_coll_->buffer(distance, 16);
     GeometryCollection r;
     if (buf && !buf->isEmpty()) {
@@ -204,7 +204,7 @@ GeometryCollection GeometryCollection::buffer(double distance) const {
     return r;
 }
 
-void GeometryCollection::normalize() { geos_coll_->normalize(); }
+inline void GeometryCollection::normalize() { geos_coll_->normalize(); }
 
 } // namespace geometry
 } // namespace shapely
