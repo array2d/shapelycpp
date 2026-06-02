@@ -86,6 +86,8 @@ public:
     bool intersects(const MultiLineString& other) const;
     template <typename U> bool intersects(const Point<U>& other) const;
     template <typename U> bool intersects(const LineString<U>& other) const;
+    template <typename U> bool intersects(const Polygon<U>& other) const;
+    template <typename U> bool intersects(const MultiPolygon<U>& other) const;
 
     // -- DE-9IM --
     template <typename U> std::string relate(const Point<U>& other) const;
@@ -271,6 +273,10 @@ template <typename T> template <typename U>
 bool MultiLineString<T>::intersects(const Point<U>& o) const { return geos_mls_->intersects(o.geos_point_.get()); }
 template <typename T> template <typename U>
 bool MultiLineString<T>::intersects(const LineString<U>& o) const { return geos_mls_->intersects(o.geos_linestring_.get()); }
+template <typename T> template <typename U>
+bool MultiLineString<T>::intersects(const Polygon<U>& o) const { return geos_mls_->intersects(o.geos_polygon_.get()); }
+template <typename T> template <typename U>
+bool MultiLineString<T>::intersects(const MultiPolygon<U>& o) const { return geos_mls_->intersects(o.geos_mp_.get()); }
 
 // -- relate / relate_pattern -----------------------------------------------
 template <typename T> template <typename U> std::string MultiLineString<T>::relate(const Point<U>& o) const { return detail::geos_relate(geos_mls_.get(), o.geos_point_.get()); }

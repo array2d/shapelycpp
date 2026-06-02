@@ -87,6 +87,7 @@ public:
     bool intersects(const LineString& other) const;
     template <typename U> bool intersects(const Point<U>& other) const;
     template <typename U> bool intersects(const Polygon<U>& other) const;
+    template <typename U> bool intersects(const MultiLineString<U>& other) const;
 
     // -- DE-9IM --
     template <typename U> std::string relate(const Point<U>& other) const;
@@ -286,6 +287,7 @@ template <typename T> template <typename U> bool LineString<T>::equals_exact(con
 template <typename T> bool LineString<T>::intersects(const LineString& o) const { return geos_linestring_->intersects(o.geos_linestring_.get()); }
 template <typename T> template <typename U> bool LineString<T>::intersects(const Point<U>& o) const { return geos_linestring_->intersects(o.geos_point_.get()); }
 template <typename T> template <typename U> bool LineString<T>::intersects(const Polygon<U>& o) const { return geos_linestring_->intersects(o.geos_polygon_.get()); }
+template <typename T> template <typename U> bool LineString<T>::intersects(const MultiLineString<U>& o) const { return geos_linestring_->intersects(o.geos_mls_.get()); }
 
 // Python: shapely/geometry/base.py::relate:L753, relate_pattern:L890
 // -- relate / relate_pattern ------------------------------------------------

@@ -59,6 +59,15 @@ PYBIND11_MODULE(shapelycpp, m) {
         .def("distance", [](const Point<double>& self, const Point<double>& o) {
             return self.distance(o);
         })
+        .def("intersects", [](const Point<double>& self, const Point<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const Point<double>& self, const LineString<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const Point<double>& self, const Polygon<double>& o) {
+            return self.intersects(o);
+        })
         BIND_ACCESSORS(Point<double>);
 
     // ======================================================================
@@ -95,6 +104,15 @@ PYBIND11_MODULE(shapelycpp, m) {
             return self.distance(o);
         })
         .def("intersects", [](const LineString<double>& self, const LineString<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const LineString<double>& self, const Point<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const LineString<double>& self, const Polygon<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const LineString<double>& self, const MultiLineString<double>& o) {
             return self.intersects(o);
         })
         BIND_ACCESSORS(LineString<double>);
@@ -135,6 +153,18 @@ PYBIND11_MODULE(shapelycpp, m) {
             return self.distance(o);
         })
         .def("intersects", [](const Polygon<double>& self, const Polygon<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const Polygon<double>& self, const Point<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const Polygon<double>& self, const LineString<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const Polygon<double>& self, const MultiLineString<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const Polygon<double>& self, const MultiPolygon<double>& o) {
             return self.intersects(o);
         })
         .def_property_readonly("coords_arr", [](const Polygon<double>& poly) {
@@ -255,6 +285,12 @@ PYBIND11_MODULE(shapelycpp, m) {
         .def("intersects", [](const MultiLineString<double>& self, const MultiLineString<double>& o) {
             return self.intersects(o);
         })
+        .def("intersects", [](const MultiLineString<double>& self, const Polygon<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const MultiLineString<double>& self, const MultiPolygon<double>& o) {
+            return self.intersects(o);
+        })
         BIND_ACCESSORS(MultiLineString<double>);
 
     // ======================================================================
@@ -300,6 +336,9 @@ PYBIND11_MODULE(shapelycpp, m) {
             return self.intersects(o);
         })
         .def("intersects", [](const MultiPolygon<double>& self, const MultiPolygon<double>& o) {
+            return self.intersects(o);
+        })
+        .def("intersects", [](const MultiPolygon<double>& self, const MultiLineString<double>& o) {
             return self.intersects(o);
         })
         BIND_ACCESSORS(MultiPolygon<double>);
