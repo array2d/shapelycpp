@@ -474,24 +474,12 @@ double LinearRing<T>::distance(const LineString<U>& o) const {
 
 // -- buffer ------------------------------------------------------------------
 
+// NOTE: same MultiPolygon→convex-hull fallback as LineString::buffer()
 template <typename T>
 Polygon<double> LinearRing<T>::buffer(double distance) const {
     if (!geos_ring_ || geos_ring_->isEmpty()) return Polygon<double>();
     auto buf = geos_ring_->buffer(distance, 16);
-    if (!buf || buf->isEmpty()) return Polygon<double>();
-    const auto* poly = buf.get();
-    if (poly->getGeometryTypeId() != geos::geom::GEOS_POLYGON) {
-        if (poly->getNumGeometries() > 0) poly = poly->getGeometryN(0);
-    }
-    if (poly->getGeometryTypeId() != geos::geom::GEOS_POLYGON || poly->isEmpty()) return Polygon<double>();
-    auto* gp = dynamic_cast<const geos::geom::Polygon*>(poly);
-    if (!gp) return Polygon<double>();
-    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
-    if (!cs || cs->isEmpty()) return Polygon<double>();
-    size_t n = cs->getSize();
-    std::vector<double> c(n*2);
-    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
-    return Polygon<double>(c.data(), n, 2);
+    return ::shapely::detail::extract_polygon_or_hull<T>(buf.get());
 }
 
 // -- boundary ----------------------------------------------------------------
@@ -840,21 +828,7 @@ Polygon<double> Polygon<T>::intersection(const Polygon<double>& other) const {
     if (geos_polygon_->isEmpty() || other.geos_polygon_->isEmpty()) return Polygon<double>();
     if (!geos_polygon_->isValid() || !other.geos_polygon_->isValid()) return Polygon<double>();
     auto inter = geos_polygon_->intersection(other.geos_polygon_.get());
-    if (!inter || inter->isEmpty()) return Polygon<double>();
-    const auto* geom = inter.get();
-    if (geom->getGeometryTypeId() == geos::geom::GEOS_POLYGON) {
-        auto* gp = dynamic_cast<const geos::geom::Polygon*>(geom);
-        if (gp) {
-            auto* cs = gp->getExteriorRing()->getCoordinatesRO();
-            if (cs && !cs->isEmpty()) {
-                size_t n = cs->getSize();
-                std::vector<double> c(n*2);
-                for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
-                return Polygon<double>(c.data(), n, 2);
-            }
-        }
-    }
-    return Polygon<double>();
+    return ::shapely::detail::extract_polygon_or_hull<T>(inter.get());
 }
 
 // Python: shapely/geometry/base.py::centroid:L478
@@ -871,43 +845,27 @@ Point<double> Polygon<T>::centroid() const {
 // Python: shapely/geometry/base.py::buffer:L541
 // -- buffer ------------------------------------------------------------------
 
+// NOTE: same MultiPolygon→convex-hull fallback as LineString::buffer()
 template <typename T>
 Polygon<double> Polygon<T>::buffer(double distance) const {
     if (geos_polygon_->isEmpty()) return Polygon<double>();
     if (!geos_polygon_->isValid() || !geos_polygon_->isSimple()) return Polygon<double>();
     auto buf = geos_polygon_->buffer(distance, 16);
-    if (!buf || buf->isEmpty()) return Polygon<double>();
-    const auto* poly = buf.get();
-    if (poly->getGeometryTypeId() != geos::geom::GEOS_POLYGON) {
-        if (poly->getNumGeometries() > 0) poly = poly->getGeometryN(0);
-    }
-    if (poly->getGeometryTypeId() != geos::geom::GEOS_POLYGON || poly->isEmpty()) return Polygon<double>();
-    auto* gp = dynamic_cast<const geos::geom::Polygon*>(poly);
-    if (!gp) return Polygon<double>();
-    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
-    if (!cs || cs->isEmpty()) return Polygon<double>();
-    size_t n = cs->getSize();
-    std::vector<double> c(n*2);
-    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
-    return Polygon<double>(c.data(), n, 2);
+    return ::shapely::detail::extract_polygon_or_hull<T>(buf.get());
 }
 
 // Python: shapely/geometry/base.py::difference:L553, sym_difference:L697
 // -- difference / union / sym_difference -------------------------------------
+// NOTE: GEOS may return MultiPolygon for diff/union/symdiff (e.g. U-shaped
+// polygon cut through the middle).  Use convex hull to collapse into a single
+// Polygon<T> so callers always get a valid result (Python shapely returns the
+// MultiPolygon as-is; we trade that for C++ type safety).
 
 #define POLY_CONSTRUCT(OP, GEOS_FN) \
 template <typename T> \
 Polygon<double> Polygon<T>::OP(const Polygon<double>& o) const { \
-    auto res = detail::GEOS_FN(geos_polygon_.get(), o.geos_polygon_.get()); \
-    if (!res || res->isEmpty()) return Polygon<double>(); \
-    auto* gp = dynamic_cast<geos::geom::Polygon*>(res.get()); \
-    if (!gp) return Polygon<double>(); \
-    auto* cs = gp->getExteriorRing()->getCoordinatesRO(); \
-    if (!cs || cs->isEmpty()) return Polygon<double>(); \
-    size_t n = cs->getSize(); \
-    std::vector<double> c(n*2); \
-    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; } \
-    return Polygon<double>(c.data(), n, 2); \
+    auto res = ::shapely::detail::GEOS_FN(geos_polygon_.get(), o.geos_polygon_.get()); \
+    return ::shapely::detail::extract_polygon_or_hull<T>(res.get()); \
 }
 POLY_CONSTRUCT(difference,       geos_difference)
 POLY_CONSTRUCT(union_op,         geos_union)
@@ -918,15 +876,7 @@ POLY_CONSTRUCT(symmetric_difference,   geos_sym_difference)
 template <typename T>
 Polygon<double> Polygon<T>::simplify(double tol) const {
     auto res = detail::geos_simplify(geos_polygon_.get(), tol);
-    if (!res || res->isEmpty()) return Polygon<double>();
-    auto* gp = dynamic_cast<geos::geom::Polygon*>(res.get());
-    if (!gp) return Polygon<double>();
-    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
-    if (!cs || cs->isEmpty()) return Polygon<double>();
-    size_t n = cs->getSize();
-    std::vector<double> c(n*2);
-    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
-    return Polygon<double>(c.data(), n, 2);
+    return ::shapely::detail::extract_polygon_or_hull<T>(res.get());
 }
 
 // Python: shapely/geometry/base.py::convex_hull:L567

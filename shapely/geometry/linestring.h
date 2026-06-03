@@ -360,24 +360,15 @@ Point<double> LineString<T>::centroid() const {
 }
 
 // Python: base.py::buffer:L541
+// NOTE: GEOS buffer() may return MultiPolygon for complex / self-intersecting
+// linestrings.  When that happens we take the convex hull so that ALL buffered
+// regions are preserved in a single Polygon<T>.  Python shapely returns the
+// MultiPolygon as-is; we trade that for C++ type safety (Polygon<T> return).
 template <typename T>
 Polygon<double> LineString<T>::buffer(double distance) const {
     if (!geos_linestring_ || geos_linestring_->isEmpty()) return Polygon<double>();
     auto buf = geos_linestring_->buffer(distance, 16);
-    if (!buf || buf->isEmpty()) return Polygon<double>();
-    const auto* poly = buf.get();
-    if (poly->getGeometryTypeId() != geos::geom::GEOS_POLYGON) {
-        if (poly->getNumGeometries() > 0) poly = poly->getGeometryN(0);
-    }
-    if (poly->getGeometryTypeId() != geos::geom::GEOS_POLYGON || poly->isEmpty()) return Polygon<double>();
-    auto* gp = dynamic_cast<const geos::geom::Polygon*>(poly);
-    if (!gp) return Polygon<double>();
-    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
-    if (!cs || cs->isEmpty()) return Polygon<double>();
-    size_t n = cs->getSize();
-    std::vector<double> c(n*2);
-    for (size_t i = 0; i < n; ++i) { c[i*2]=cs->getAt(i).x; c[i*2+1]=cs->getAt(i).y; }
-    return Polygon<double>(c.data(), n, 2);
+    return ::shapely::detail::extract_polygon_or_hull<T>(buf.get());
 }
 
 // Python: shapely/geometry/base.py L553-L703

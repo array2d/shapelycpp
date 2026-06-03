@@ -18,6 +18,7 @@
 #include <geos/geom/Point.h>
 #include <geos/geom/LineString.h>
 #include <geos/geom/Polygon.h>
+#include <geos/geom/MultiPolygon.h>
 #include <geos/geom/CoordinateSequence.h>
 #include <geos/geom/CoordinateSequenceFactory.h>
 #include <geos/geom/Envelope.h>
@@ -317,6 +318,57 @@ inline std::unique_ptr<geos::geom::Geometry> geos_unary_union(
     const geos::geom::Geometry* g) {
     if (!g || g->isEmpty()) return nullptr;
     return std::unique_ptr<geos::geom::Geometry>(g->Union());
+}
+
+// --- Polygon<T> extraction helper -----------------------------------------
+// GEOS operations (buffer, difference, union, symdiff, simplify) may return
+// MultiPolygon.  When the caller expects a single Polygon<T> we fall back to
+// the convex hull of the MultiPolygon to avoid silently discarding geometry.
+template <typename T = double>
+inline shapely::geometry::Polygon<double> extract_polygon_or_hull(
+    const geos::geom::Geometry* geom) {
+    using shapely::geometry::Polygon;
+    if (!geom || geom->isEmpty()) return Polygon<double>();
+
+    // Single Polygon — fast path
+    auto* gp = dynamic_cast<const geos::geom::Polygon*>(geom);
+    if (gp) goto emit;
+
+    // MultiPolygon → convex hull (preserves every sub-polygon)
+    {
+        auto* mp = dynamic_cast<const geos::geom::MultiPolygon*>(geom);
+        if (mp && mp->getNumGeometries() > 0) {
+            auto hull = mp->convexHull();
+            gp = dynamic_cast<const geos::geom::Polygon*>(hull.get());
+            if (gp) goto emit;
+        }
+    }
+
+    // GeometryCollection — search children
+    for (size_t i = 0; i < geom->getNumGeometries(); ++i) {
+        auto* g = geom->getGeometryN(i);
+        auto* mp2 = dynamic_cast<const geos::geom::MultiPolygon*>(g);
+        if (mp2 && mp2->getNumGeometries() > 0) {
+            auto hull = mp2->convexHull();
+            gp = dynamic_cast<const geos::geom::Polygon*>(hull.get());
+            if (gp) goto emit;
+        }
+        gp = dynamic_cast<const geos::geom::Polygon*>(g);
+        if (gp) goto emit;
+    }
+    return Polygon<double>();
+
+emit:
+    if (!gp || gp->isEmpty()) return Polygon<double>();
+    auto* cs = gp->getExteriorRing()->getCoordinatesRO();
+    if (!cs || cs->isEmpty()) return Polygon<double>();
+    size_t n = cs->getSize();
+    std::vector<double> c(n*2);
+    for (size_t i = 0; i < n; ++i) {
+        c[i*2]   = cs->getAt(i).x;
+        c[i*2+1] = cs->getAt(i).y;
+    }
+    return Polygon<double>(c.data(), n, 2);
 }
 
 } // namespace detail
