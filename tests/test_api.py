@@ -1050,3 +1050,180 @@ class TestHighVolumeIntersects:
             i_cpp = cpp.intersects_linestring_polygon(cpp.linestring(l), cpp.polygon(c))
             i_py = PyLineString(l).intersects(PyPolygon(c))
             assert i_cpp == i_py
+
+
+# ==============================================================================
+# 3-COLUMN ARRAY SHAPE HANDLING — verify (N,≥3) → x,y extraction
+# ==============================================================================
+# Regression tests for the array_to_double_vec() fix (hardcoded rows*2 → stride).
+# Covers: generic py::array overload (int dtype), typed double overload, point,
+# polygon, multipoint; plus row/column layout consistency and non-contiguous view guard.
+
+class TestArrayShape3D:
+    """Verify (N,≥3) arrays correctly extract x,y columns across all factory overloads."""
+
+    # -- (N,2) regression: generic overload (int32) still works ----------------------
+
+    def test_2col_generic(self, cpp):
+        coords = np.array([[0, 1], [2, 3], [4, 5]], dtype=np.int32)
+        ls = cpp.linestring(coords)
+        assert ls.coords() == [(0.0, 1.0), (2.0, 3.0), (4.0, 5.0)]
+
+    # -- (N,3) generic overload: z column correctly ignored -------------------------
+
+    def test_3col_generic(self, cpp):
+        coords = np.array([[10, 20, 999], [30, 40, 888], [50, 60, 777]], dtype=np.int32)
+        ls = cpp.linestring(coords)
+        assert ls.coords() == [(10.0, 20.0), (30.0, 40.0), (50.0, 60.0)]
+
+    # -- (N,3) typed double overload: stride by shape[1]=3 --------------------------
+
+    def test_3col_typed_double(self, cpp):
+        coords = np.array([[10.0, 20.0, 99.0], [30.0, 40.0, 88.0], [50.0, 60.0, 77.0]],
+                          dtype=np.float64)
+        ls = cpp.linestring(coords)
+        assert ls.coords() == [(10.0, 20.0), (30.0, 40.0), (50.0, 60.0)]
+
+    # -- Equality: (N,3) produces identical coords to (N,2) -------------------------
+
+    def test_3col_equals_2col_generic(self, cpp):
+        coords_3 = np.array([[1, 2, 99], [3, 4, 88], [5, 6, 77]], dtype=np.int32)
+        coords_2 = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=np.float64)
+        ls3 = cpp.linestring(coords_3)
+        ls2 = cpp.linestring(coords_2)
+        assert ls3.coords() == ls2.coords()
+        # Distance to self should also match
+        assert ls3.length() == ls2.length()
+
+    def test_3col_equals_2col_typed(self, cpp):
+        coords_3 = np.array([[1.0, 2.0, 99.0], [3.0, 4.0, 88.0], [5.0, 6.0, 77.0]],
+                            dtype=np.float64)
+        coords_2 = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=np.float64)
+        ls3 = cpp.linestring(coords_3)
+        ls2 = cpp.linestring(coords_2)
+        assert ls3.coords() == ls2.coords()
+        assert ls3.length() == ls2.length()
+
+    # -- Polygon (N,3) generic ------------------------------------------------------
+
+    def test_polygon_3col_generic(self, cpp):
+        coords = np.array([[0, 0, 1], [10, 0, 2], [10, 10, 3], [0, 10, 4], [0, 0, 5]],
+                          dtype=np.int32)
+        poly = cpp.polygon(coords)
+        ext = cpp.polygon_exterior(poly)
+        # First 5 points must match (GEOS may auto-close to 6 points)
+        assert ext.tolist()[:5] == [[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0], [0.0, 0.0]]
+
+    def test_polygon_3col_typed(self, cpp):
+        coords = np.array([[0.0, 0.0, 1.0], [10.0, 0.0, 2.0], [10.0, 10.0, 3.0],
+                           [0.0, 10.0, 4.0], [0.0, 0.0, 5.0]], dtype=np.float64)
+        poly = cpp.polygon(coords)
+        ext = cpp.polygon_exterior(poly)
+        assert ext.tolist()[:5] == [[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0], [0.0, 0.0]]
+
+    # -- Point: 1D [x,y] and 2D (N,≥2) int arrays (auto-double overload) -------------
+
+    def test_point_1d_int(self, cpp):
+        p = cpp.point(np.array([3, 4], dtype=np.int32))
+        assert p.coords() == [(3.0, 4.0)]
+
+    def test_point_2d_int(self, cpp):
+        p = cpp.point(np.array([[5, 6]], dtype=np.int32))
+        assert p.coords() == [(5.0, 6.0)]
+
+    def test_point_2d_3col_int(self, cpp):
+        """Point from (N,3) int: takes first 2 elements (row 0, col 0-1)."""
+        p = cpp.point(np.array([[7, 8, 999], [9, 10, 888]], dtype=np.int32))
+        assert p.coords() == [(7.0, 8.0)]
+
+    # -- MultiPoint (N,3) generic ---------------------------------------------------
+
+    def test_multipoint_3col_generic(self, cpp):
+        mp = cpp.multipoint(np.array([[1, 2, 99], [4, 6, 88]], dtype=np.int32))
+        # Verify via distance: (1,2) should be a point in the multipoint
+        p = cpp.point(1.0, 2.0)
+        assert mp.distance(p) == 0.0
+
+    # -- LinearRing (N,3) -----------------------------------------------------------
+
+    def test_linearring_3col(self, cpp, C):
+        ring = C.linearring(np.array([[0, 0, 1], [1, 0, 2], [1, 1, 3], [0, 0, 4]],
+                                      dtype=np.float64))
+        assert ring.is_closed() == True
+        assert ring.is_ring() == True
+
+    # -- Row/column layout consistency ----------------------------------------------
+
+    def test_row_col_layout(self, cpp):
+        """Verify Python arr[i,j] ↔ C++ ptr[i*shape[1]+j] mapping."""
+        # (3,4) array: row-major [1,2,3,4, 5,6,7,8, 9,10,11,12]
+        arr = np.array([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]], dtype=np.float64)
+        ls = cpp.linestring(arr)
+        # C++ takes coords_[i*4+0], coords_[i*4+1] → first 2 columns per row
+        assert ls.coords() == [(1.0, 2.0), (5.0, 6.0), (9.0, 10.0)]
+
+        # (3,3) direct: stride=3, skip z
+        arr3 = np.array([[10, 20, 99], [30, 40, 88], [50, 60, 77]], dtype=np.float64)
+        ls3 = cpp.linestring(arr3)
+        assert ls3.coords() == [(10.0, 20.0), (30.0, 40.0), (50.0, 60.0)]
+
+    # -- poly_exterior output shape --------------------------------------------------
+
+    def test_exterior_shape(self, cpp):
+        coords = np.array([[0, 0], [10, 0], [10, 10], [0, 10]], dtype=np.float64)
+        poly = cpp.polygon(coords)
+        ext = cpp.polygon_exterior(poly)
+        assert ext.ndim == 2
+        assert ext.shape[1] == 2  # always 2 columns
+        assert ext.dtype == np.float64
+
+    # -- Non-contiguous view rejection (fail-fast with clear error) ----------------
+
+    def test_noncontiguous_view_rejected_typed(self, cpp):
+        """Typed overloads throw on non-contiguous views (e.g. [:, :2])."""
+        arr = np.array([[10, 20, 99], [30, 40, 88], [50, 60, 77]], dtype=np.float64)
+        view = arr[:, :2]
+        assert not view.flags['C_CONTIGUOUS']
+        with pytest.raises(ValueError, match="C-contiguous"):
+            cpp.linestring(view)
+
+    def test_noncontiguous_view_rejected_generic(self, cpp):
+        """Generic (int dtype) overloads throw on non-contiguous views."""
+        arr = np.array([[10, 20, 99], [30, 40, 88], [50, 60, 77]], dtype=np.int32)
+        view = arr[:, :2]
+        assert not view.flags['C_CONTIGUOUS']
+        with pytest.raises(ValueError, match="C-contiguous"):
+            cpp.linestring(view)
+
+    def test_noncontiguous_copy_works_typed(self, cpp):
+        """.copy() on a non-contiguous view produces correct results."""
+        arr = np.array([[10, 20, 99], [30, 40, 88], [50, 60, 77]], dtype=np.float64)
+        cpy = arr[:, :2].copy()
+        assert cpy.flags['C_CONTIGUOUS']
+        ls = cpp.linestring(cpy)
+        assert ls.coords() == [(10.0, 20.0), (30.0, 40.0), (50.0, 60.0)]
+
+    def test_noncontiguous_copy_works_generic(self, cpp):
+        """.copy() on a non-contiguous view works for generic overload."""
+        arr = np.array([[10, 20, 99], [30, 40, 88], [50, 60, 77]], dtype=np.int32)
+        cpy = arr[:, :2].copy()
+        assert cpy.flags['C_CONTIGUOUS']
+        ls = cpp.linestring(cpy)
+        assert ls.coords() == [(10.0, 20.0), (30.0, 40.0), (50.0, 60.0)]
+
+    @pytest.mark.parametrize("factory, arr_dtype", [
+        ("point", np.float64),
+        ("point", np.int32),
+        ("polygon", np.float64),
+        ("polygon", np.int32),
+        ("multipoint", np.float64),
+        ("multipoint", np.int32),
+    ])
+    def test_noncontiguous_rejected_all_factories(self, cpp, factory, arr_dtype):
+        """All factory functions reject non-contiguous views."""
+        arr = np.array([[10, 20, 99], [30, 40, 88], [50, 60, 77]], dtype=arr_dtype)
+        view = arr[:, :2]
+        assert not view.flags['C_CONTIGUOUS']
+        fn = getattr(cpp, factory)
+        with pytest.raises(ValueError, match="C-contiguous"):
+            fn(view)

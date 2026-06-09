@@ -43,21 +43,57 @@ py::array_t<T> native_to_array(const T* data, size_t rows, size_t cols) {
     return result;
 }
 
+/// Throw if a py::buffer_info is not C-contiguous (row-major, no gaps).
+/// Protects against silent data corruption when callers pass sliced views
+/// (e.g. arr[:, :2], arr[::2], arr.T) whose memory strides don't match shape.
+inline void ensure_c_contiguous(const py::buffer_info& buf) {
+    if (buf.ndim == 0) return;
+    // Last dimension stride must equal element size
+    if (buf.strides[buf.ndim - 1] != buf.itemsize) {
+        throw std::invalid_argument(
+            "array must be C-contiguous; use .copy() on sliced/transposed views "
+            "(e.g. arr.copy() or arr[:, :2].copy())");
+    }
+    // Each higher dimension stride must equal next-dim-size × next-stride
+    for (ssize_t i = buf.ndim - 2; i >= 0; --i) {
+        ssize_t expected = buf.shape[i + 1] * buf.strides[i + 1];
+        if (buf.strides[i] != expected) {
+            throw std::invalid_argument(
+                "array must be C-contiguous; use .copy() on sliced/transposed views "
+                "(e.g. arr.copy() or arr[:, :2].copy())");
+        }
+    }
+}
+
 /// Convert any py::array coordinate buffer to std::vector<double>.
+/// Extracts the first 2 columns per row — safe for (N,2) and (N,≥3) arrays.
 /// dtype double → direct copy; float32/other → cast & widen to double.
 inline std::vector<double> array_to_double_vec(const py::array& arr) {
     auto buf = arr.request();
-    size_t sz = static_cast<size_t>(buf.shape[0]) * 2;
-    std::vector<double> tmp(sz);
+    if (buf.ndim != 2) {
+        throw std::invalid_argument("array_to_double_vec: expected 2D array");
+    }
+    ensure_c_contiguous(buf);
+    size_t rows = static_cast<size_t>(buf.shape[0]);
+    size_t cols = static_cast<size_t>(buf.shape[1]);
+    std::vector<double> tmp(rows * 2);
     if (arr.dtype().is(py::dtype::of<double>())) {
         const double* src = static_cast<const double*>(buf.ptr);
-        std::copy(src, src + sz, tmp.begin());
+        for (size_t r = 0; r < rows; ++r) {
+            size_t base = r * cols;
+            tmp[r * 2]     = src[base];
+            tmp[r * 2 + 1] = src[base + 1];
+        }
     } else {
         // float32 or other → cast through pybind11 to float32, then widen
         auto f32 = py::cast<py::array_t<float>>(arr);
         auto fbuf = f32.request();
         const float* src = static_cast<const float*>(fbuf.ptr);
-        for (size_t i = 0; i < sz; ++i) tmp[i] = static_cast<double>(src[i]);
+        for (size_t r = 0; r < rows; ++r) {
+            size_t base = r * cols;
+            tmp[r * 2]     = static_cast<double>(src[base]);
+            tmp[r * 2 + 1] = static_cast<double>(src[base + 1]);
+        }
     }
     return tmp;
 }
@@ -72,27 +108,43 @@ inline Point<float>  point(float x, float y)  { return Point<float>(x, y); }
 
 inline Point<double> point(const py::array_t<double>& arr) {
     auto buf = arr.request();
+    ensure_c_contiguous(buf);
     const double* p = static_cast<const double*>(buf.ptr);
     return Point<double>(buf.size > 0 ? p[0] : 0, buf.size > 1 ? p[1] : 0);
 }
 inline Point<float> point(const py::array_t<float>& arr) {
     auto buf = arr.request();
+    ensure_c_contiguous(buf);
     const float* p = static_cast<const float*>(buf.ptr);
     return Point<float>(buf.size > 0 ? p[0] : 0, buf.size > 1 ? p[1] : 0);
 }
 // auto-double: accept any dtype (int, unknown), always produce Point<double>
+// Handles 1D [x,y] and 2D (N,≥2) arrays — takes first 2 elements.
 inline Point<double> point(const py::array& arr) {
-    auto tmp = array_to_double_vec(arr);
-    return Point<double>(tmp[0], tmp[1]);
+    auto buf = arr.request();
+    ensure_c_contiguous(buf);
+    if (buf.size < 2) return Point<double>(0, 0);
+    if (arr.dtype().is(py::dtype::of<double>())) {
+        const double* p = static_cast<const double*>(buf.ptr);
+        return Point<double>(p[0], p[1]);
+    } else {
+        // float32 or int/other → cast through pybind11 to float32, then widen
+        auto f32 = py::cast<py::array_t<float>>(arr);
+        auto fbuf = f32.request();
+        const float* p = static_cast<const float*>(fbuf.ptr);
+        return Point<double>(static_cast<double>(p[0]), static_cast<double>(p[1]));
+    }
 }
 
 // -- LineString --
 inline LineString<double> linestring(const py::array_t<double>& arr) {
     auto buf = arr.request();
+    ensure_c_contiguous(buf);
     return LineString<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 inline LineString<float> linestring(const py::array_t<float>& arr) {
     auto buf = arr.request();
+    ensure_c_contiguous(buf);
     return LineString<float>(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 inline LineString<double> linestring(const py::array& arr) {
@@ -104,10 +156,12 @@ inline LineString<double> linestring(const py::array& arr) {
 // -- Polygon --
 inline Polygon<double> polygon(const py::array_t<double>& arr) {
     auto buf = arr.request();
+    ensure_c_contiguous(buf);
     return Polygon<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 inline Polygon<float> polygon(const py::array_t<float>& arr) {
     auto buf = arr.request();
+    ensure_c_contiguous(buf);
     return Polygon<float>(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 inline Polygon<double> polygon(const py::array& arr) {
@@ -119,6 +173,7 @@ inline Polygon<double> polygon(const py::array& arr) {
 // -- LinearRing (double only for now) --
 inline LinearRing<double> linearring(const py::array_t<double>& arr) {
     auto buf = arr.request();
+    ensure_c_contiguous(buf);
     return LinearRing<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 inline LinearRing<double> linearring(const py::array& arr) {
@@ -130,10 +185,12 @@ inline LinearRing<double> linearring(const py::array& arr) {
 // -- MultiPoint: single array of shape (n_pts, 2) --
 inline MultiPoint<double> multipoint(const py::array_t<double>& arr) {
     auto buf = arr.request();
+    ensure_c_contiguous(buf);
     return MultiPoint<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 inline MultiPoint<float> multipoint(const py::array_t<float>& arr) {
     auto buf = arr.request();
+    ensure_c_contiguous(buf);
     return MultiPoint<float>(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 inline MultiPoint<double> multipoint(const py::array& arr) {
@@ -147,6 +204,7 @@ inline MultiLineString<double> multilinestring(const std::vector<py::array_t<dou
     MultiLineString<double> mls;
     for (auto& arr : arrays) {
         auto buf = arr.request();
+        ensure_c_contiguous(buf);
         mls.add_line(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
     }
     return mls;
@@ -155,6 +213,7 @@ inline MultiLineString<float> multilinestring(const std::vector<py::array_t<floa
     MultiLineString<float> mls;
     for (auto& arr : arrays) {
         auto buf = arr.request();
+        ensure_c_contiguous(buf);
         mls.add_line(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
     }
     return mls;
@@ -174,6 +233,7 @@ inline MultiPolygon<double> multipolygon(const std::vector<py::array_t<double>>&
     MultiPolygon<double> mp;
     for (auto& arr : arrays) {
         auto buf = arr.request();
+        ensure_c_contiguous(buf);
         mp.add_polygon(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
     }
     return mp;
@@ -182,6 +242,7 @@ inline MultiPolygon<float> multipolygon(const std::vector<py::array_t<float>>& a
     MultiPolygon<float> mp;
     for (auto& arr : arrays) {
         auto buf = arr.request();
+        ensure_c_contiguous(buf);
         mp.add_polygon(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
     }
     return mp;
