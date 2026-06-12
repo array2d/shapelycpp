@@ -21,6 +21,7 @@
 #include "../shapely/geometry/multipolygon.h"
 #include "../shapely/geometry/geometrycollection.h"
 
+#include <array>
 #include <cstring>
 #include <tuple>
 #include <vector>
@@ -151,6 +152,19 @@ inline LineString<double> linestring(const py::array& arr) {
     py::ssize_t n = arr.request().shape[0];
     auto tmp = array_to_double_vec(arr);
     return LineString<double>(tmp.data(), static_cast<size_t>(n), 2);
+}
+
+// Accept native C++ coordinate list: std::vector<std::array<double, 2>>
+// No numpy intermediate — flattens directly into LineString<double>.
+inline LineString<double> linestring(const std::vector<std::array<double, 2>>& pts) {
+    if (pts.size() < 2)
+        throw std::runtime_error("LineString: rows must be >= 2");
+    std::vector<double> flat(pts.size() * 2);
+    for (size_t i = 0; i < pts.size(); ++i) {
+        flat[i * 2] = pts[i][0];
+        flat[i * 2 + 1] = pts[i][1];
+    }
+    return LineString<double>(flat.data(), pts.size(), 2);
 }
 
 // -- Polygon --
