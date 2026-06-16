@@ -113,11 +113,13 @@ inline Point<double> point(const py::array_t<double>& arr) {
     const double* p = static_cast<const double*>(buf.ptr);
     return Point<double>(buf.size > 0 ? p[0] : 0, buf.size > 1 ? p[1] : 0);
 }
-inline Point<float> point(const py::array_t<float>& arr) {
+// float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
+inline Point<double> point(const py::array_t<float>& arr) {
     auto buf = arr.request();
     ensure_c_contiguous(buf);
     const float* p = static_cast<const float*>(buf.ptr);
-    return Point<float>(buf.size > 0 ? p[0] : 0, buf.size > 1 ? p[1] : 0);
+    return Point<double>(buf.size > 0 ? static_cast<double>(p[0]) : 0,
+                         buf.size > 1 ? static_cast<double>(p[1]) : 0);
 }
 // auto-double: accept any dtype (int, unknown), always produce Point<double>
 // Handles 1D [x,y] and 2D (N,≥2) arrays — takes first 2 elements.
@@ -143,10 +145,11 @@ inline LineString<double> linestring(const py::array_t<double>& arr) {
     ensure_c_contiguous(buf);
     return LineString<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
-inline LineString<float> linestring(const py::array_t<float>& arr) {
-    auto buf = arr.request();
-    ensure_c_contiguous(buf);
-    return LineString<float>(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
+// float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
+inline LineString<double> linestring(const py::array_t<float>& arr) {
+    py::ssize_t n = arr.request().shape[0];
+    auto tmp = array_to_double_vec(arr);
+    return LineString<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 inline LineString<double> linestring(const py::array& arr) {
     py::ssize_t n = arr.request().shape[0];
@@ -173,10 +176,11 @@ inline Polygon<double> polygon(const py::array_t<double>& arr) {
     ensure_c_contiguous(buf);
     return Polygon<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
-inline Polygon<float> polygon(const py::array_t<float>& arr) {
-    auto buf = arr.request();
-    ensure_c_contiguous(buf);
-    return Polygon<float>(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
+// float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
+inline Polygon<double> polygon(const py::array_t<float>& arr) {
+    py::ssize_t n = arr.request().shape[0];
+    auto tmp = array_to_double_vec(arr);
+    return Polygon<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 inline Polygon<double> polygon(const py::array& arr) {
     py::ssize_t n = arr.request().shape[0];
@@ -202,10 +206,11 @@ inline MultiPoint<double> multipoint(const py::array_t<double>& arr) {
     ensure_c_contiguous(buf);
     return MultiPoint<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
-inline MultiPoint<float> multipoint(const py::array_t<float>& arr) {
-    auto buf = arr.request();
-    ensure_c_contiguous(buf);
-    return MultiPoint<float>(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
+// float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
+inline MultiPoint<double> multipoint(const py::array_t<float>& arr) {
+    py::ssize_t n = arr.request().shape[0];
+    auto tmp = array_to_double_vec(arr);
+    return MultiPoint<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 inline MultiPoint<double> multipoint(const py::array& arr) {
     py::ssize_t n = arr.request().shape[0];
@@ -223,12 +228,13 @@ inline MultiLineString<double> multilinestring(const std::vector<py::array_t<dou
     }
     return mls;
 }
-inline MultiLineString<float> multilinestring(const std::vector<py::array_t<float>>& arrays) {
-    MultiLineString<float> mls;
+// float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
+inline MultiLineString<double> multilinestring(const std::vector<py::array_t<float>>& arrays) {
+    MultiLineString<double> mls;
     for (auto& arr : arrays) {
-        auto buf = arr.request();
-        ensure_c_contiguous(buf);
-        mls.add_line(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
+        py::ssize_t n = arr.request().shape[0];
+        auto tmp = array_to_double_vec(arr);
+        mls.add_line(tmp.data(), static_cast<size_t>(n), 2);
     }
     return mls;
 }
@@ -252,12 +258,13 @@ inline MultiPolygon<double> multipolygon(const std::vector<py::array_t<double>>&
     }
     return mp;
 }
-inline MultiPolygon<float> multipolygon(const std::vector<py::array_t<float>>& arrays) {
-    MultiPolygon<float> mp;
+// float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
+inline MultiPolygon<double> multipolygon(const std::vector<py::array_t<float>>& arrays) {
+    MultiPolygon<double> mp;
     for (auto& arr : arrays) {
-        auto buf = arr.request();
-        ensure_c_contiguous(buf);
-        mp.add_polygon(static_cast<const float*>(buf.ptr), buf.shape[0], buf.shape[1]);
+        py::ssize_t n = arr.request().shape[0];
+        auto tmp = array_to_double_vec(arr);
+        mp.add_polygon(tmp.data(), static_cast<size_t>(n), 2);
     }
     return mp;
 }

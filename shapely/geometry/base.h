@@ -40,6 +40,8 @@ namespace detail {
 inline std::string geos_to_wkt(const geos::geom::Geometry* g) {
     if (!g || g->isEmpty()) return "GEOMETRYCOLLECTION EMPTY";
     geos::io::WKTWriter writer;
+    writer.setTrim(true);          // match Python shapely's default trimmed output
+    writer.setOutputDimension(2);  // drop Z if present, match shapely 2D default
     return writer.write(g);
 }
 
