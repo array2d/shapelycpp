@@ -234,22 +234,19 @@ std::tuple<std::vector<T>, std::vector<T>> LineString<T>::xy() const {
 
 template <typename T>
 double LineString<T>::distance(const LineString& o) const {
-    geos::operation::distance::DistanceOp op(geos_linestring_.get(), o.geos_linestring_.get());
-    return op.distance();
+    return detail::geos_safe_distance(geos_linestring_.get(), o.geos_linestring_.get());
 }
 template <typename T> template <typename U>
 double LineString<T>::distance(const Polygon<U>& o) const {
-    geos::operation::distance::DistanceOp op(geos_linestring_.get(), o.geos_polygon_.get());
-    return op.distance();
+    return detail::geos_safe_distance(geos_linestring_.get(), o.geos_polygon_.get());
 }
 template <typename T> template <typename U>
 double LineString<T>::distance(const Point<U>& o) const {
-    geos::operation::distance::DistanceOp op(geos_linestring_.get(), o.geos_point_.get());
-    return op.distance();
+    return detail::geos_safe_distance(geos_linestring_.get(), o.geos_point_.get());
 }
 template <typename T> template <typename U>
 double LineString<T>::distance(const MultiLineString<U>& o) const {
-    geos::operation::distance::DistanceOp op(geos_linestring_.get(), o.geos_mls_.get()); return op.distance();
+    return detail::geos_safe_distance(geos_linestring_.get(), o.geos_mls_.get());
 }
 
 // Python: shapely/geometry/base.py predicates L753-L813

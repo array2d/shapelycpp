@@ -203,20 +203,17 @@ std::tuple<std::vector<T>, std::vector<T>> Point<T>::xy() const {
 
 template <typename T>
 double Point<T>::distance(const Point& other) const {
-    geos::operation::distance::DistanceOp op(geos_point_.get(), other.geos_point_.get());
-    return op.distance();
+    return detail::geos_safe_distance(geos_point_.get(), other.geos_point_.get());
 }
 
 template <typename T> template <typename U>
 double Point<T>::distance(const LineString<U>& other) const {
-    geos::operation::distance::DistanceOp op(geos_point_.get(), other.geos_linestring_.get());
-    return op.distance();
+    return detail::geos_safe_distance(geos_point_.get(), other.geos_linestring_.get());
 }
 
 template <typename T> template <typename U>
 double Point<T>::distance(const Polygon<U>& other) const {
-    geos::operation::distance::DistanceOp op(geos_point_.get(), other.geos_polygon_.get());
-    return op.distance();
+    return detail::geos_safe_distance(geos_point_.get(), other.geos_polygon_.get());
 }
 
 // Python: shapely/geometry/base.py::buffer:L541

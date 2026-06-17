@@ -31,8 +31,33 @@
 #include <geos/simplify/TopologyPreservingSimplifier.h>
 #include <geos/operation/valid/IsValidOp.h>
 
+#include <cmath>
+#include <stdexcept>
+
 namespace shapely {
 namespace detail {
+
+/// Catch GEOS exceptions and return a safe fallback (matching Python shapely behavior).
+/// Python shapely does NOT throw on NaN/Inf geometries — it returns NaN / inf / False.
+#define GEOS_SAFE_DOUBLE(op_name, expr) \
+    ([&]() -> double { \
+        try { return (expr); } \
+        catch (const std::exception&) { \
+            return std::numeric_limits<double>::quiet_NaN(); \
+        } \
+    }())
+
+#define GEOS_SAFE_BOOL(op_name, expr) \
+    ([&]() -> bool { \
+        try { return (expr); } \
+        catch (const std::exception&) { return false; } \
+    }())
+
+#define GEOS_SAFE_STRING(op_name, expr) \
+    ([&]() -> std::string { \
+        try { return (expr); } \
+        catch (const std::exception&) { return std::string(); } \
+    }())
 
 // --- WKT / WKB serialization ------------------------------------------------
 
@@ -194,14 +219,27 @@ inline double geos_length(const geos::geom::Geometry* g) {
 // Python: shapely/geometry/base.py::distance:L438
 inline double geos_distance(const geos::geom::Geometry* a, const geos::geom::Geometry* b) {
     if (!a || !b) return 0.0;
-    geos::operation::distance::DistanceOp op(a, b);
-    return op.distance();
+    return GEOS_SAFE_DOUBLE("distance", [&]{
+        geos::operation::distance::DistanceOp op(a, b);
+        return op.distance();
+    }());
 }
 
 // Python: shapely/geometry/base.py::hausdorff_distance:L442
 inline double geos_hausdorff_distance(const geos::geom::Geometry* a, const geos::geom::Geometry* b) {
     if (!a || !b) return 0.0;
-    return geos::algorithm::distance::DiscreteHausdorffDistance(*a, *b).distance();
+    return GEOS_SAFE_DOUBLE("hausdorff_distance",
+        geos::algorithm::distance::DiscreteHausdorffDistance(*a, *b).distance());
+}
+
+/// Safe DistanceOp wrapper — returns NaN on GEOS exception (matching Python shapely).
+/// Python shapely does NOT crash on degenerate/NaN geometries; it returns NaN/inf.
+inline double geos_safe_distance(const geos::geom::Geometry* a, const geos::geom::Geometry* b) {
+    if (!a || !b) return 0.0;
+    return GEOS_SAFE_DOUBLE("distance", [&] {
+        geos::operation::distance::DistanceOp op(a, b);
+        return op.distance();
+    }());
 }
 
 // Python: shapely/geometry/base.py::bounds:L470

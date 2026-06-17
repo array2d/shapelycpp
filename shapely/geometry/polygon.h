@@ -458,18 +458,15 @@ void LinearRing<T>::normalize() { geos_ring_->normalize(); }
 
 template <typename T>
 double LinearRing<T>::distance(const LinearRing& o) const {
-    geos::operation::distance::DistanceOp op(geos_ring_.get(), o.geos_ring_.get());
-    return op.distance();
+    return detail::geos_safe_distance(geos_ring_.get(), o.geos_ring_.get());
 }
 template <typename T> template <typename U>
 double LinearRing<T>::distance(const Point<U>& o) const {
-    geos::operation::distance::DistanceOp op(geos_ring_.get(), o.geos_point_.get());
-    return op.distance();
+    return detail::geos_safe_distance(geos_ring_.get(), o.geos_point_.get());
 }
 template <typename T> template <typename U>
 double LinearRing<T>::distance(const LineString<U>& o) const {
-    geos::operation::distance::DistanceOp op(geos_ring_.get(), o.geos_linestring_.get());
-    return op.distance();
+    return detail::geos_safe_distance(geos_ring_.get(), o.geos_linestring_.get());
 }
 
 // -- buffer ------------------------------------------------------------------
@@ -721,26 +718,23 @@ double Polygon<T>::area() const { return geos_polygon_->getArea(); }
 
 template <typename T>
 double Polygon<T>::distance(const Polygon& o) const {
-    geos::operation::distance::DistanceOp op(geos_polygon_.get(), o.geos_polygon_.get());
-    return op.distance();
+    return detail::geos_safe_distance(geos_polygon_.get(), o.geos_polygon_.get());
 }
 template <typename T> template <typename U>
 double Polygon<T>::distance(const LineString<U>& o) const {
-    geos::operation::distance::DistanceOp op(geos_polygon_.get(), o.geos_linestring_.get());
-    return op.distance();
+    return detail::geos_safe_distance(geos_polygon_.get(), o.geos_linestring_.get());
 }
 template <typename T> template <typename U>
 double Polygon<T>::distance(const Point<U>& o) const {
-    geos::operation::distance::DistanceOp op(geos_polygon_.get(), o.geos_point_.get());
-    return op.distance();
+    return detail::geos_safe_distance(geos_polygon_.get(), o.geos_point_.get());
 }
 template <typename T> template <typename U>
 double Polygon<T>::distance(const MultiLineString<U>& o) const {
-    geos::operation::distance::DistanceOp op(geos_polygon_.get(), o.geos_mls_.get()); return op.distance();
+    return detail::geos_safe_distance(geos_polygon_.get(), o.geos_mls_.get());
 }
 template <typename T> template <typename U>
 double Polygon<T>::distance(const MultiPolygon<U>& o) const {
-    geos::operation::distance::DistanceOp op(geos_polygon_.get(), o.geos_mp_.get()); return op.distance();
+    return detail::geos_safe_distance(geos_polygon_.get(), o.geos_mp_.get());
 }
 
 // Python: shapely/geometry/base.py predicates L753-L813

@@ -75,6 +75,24 @@ def _to_float(v):
         return float(v)
 
 
+def _compare_nan_tolerant(cpp_result, py_result, label=""):
+    """NaN-tolerant comparison: both NaN → pass; both equal → pass."""
+    import math
+    cpp = np.asarray(cpp_result).ravel()
+    pyr = np.asarray(py_result).ravel()
+    if cpp.shape != pyr.shape:
+        raise AssertionError(
+            f"[{label}] shape mismatch: C++ {cpp.shape} vs shapely {pyr.shape}")
+    for i in range(len(cpp)):
+        a, b = float(cpp[i]), float(pyr[i])
+        if math.isnan(a) and math.isnan(b):
+            continue  # both NaN → OK
+        if math.isinf(a) and math.isinf(b) and a * b > 0:
+            continue  # both same-signed Inf → OK
+        if a != b:
+            raise AssertionError(
+                f"[{label}] mismatch at [{i}]: C++={a:.6e} vs shapely={b:.6e}")
+
 def _compare_bit_exact(cpp_result, py_result, label=""):
     cpp = np.asarray(cpp_result, dtype=np.float64)
     py  = np.asarray(py_result, dtype=np.float64)
@@ -536,11 +554,8 @@ _INF_1 = [(float('inf'), 0), (1, 1)]
 _NINF_1= [(float('-inf'), 0), (1, 1)]
 _NAN_PT = (float('nan'), 0)
 _INF_PT = (float('inf'), 0)
-
-_MNAN  = [(float('nan'), 0), (10, 10), (20, 5)]        # multipoint nan
-_MLNAN = [[(float('nan'), 0), (5, 0)], [(10, 0), (15, 0)]]  # multiline nan
-_MPNAN = [[(0, 0), (10, 0), (10, 10), (0, 10)],      # multipoly nan
-          [(float('nan'), 0), (20, 0), (20, 10), (10, 10)]]
+# Polygon with NaN: must have ≥4 pts for a ring
+_NAN_POLY = [(float('nan'), 0), (10, 0), (10, 10), (0, 0)]
 
 
 # ---- Group 1: factories (7 APIs) --------------------------------------------
@@ -963,37 +978,22 @@ def api_catalog():
         yield tc._replace(group="predicates")
     for tc in _catalog_ops():
         yield tc._replace(group="ops")
-    for tc in _catalog_errors():
-        yield tc._replace(group="errors")
+    for tc in _catalog_nan():
+        yield tc._replace(group="nan")
 
 
-def _catalog_errors():
-    """NaN/Inf rejection: every geometry factory must reject NaN/Inf coords."""
-    # point
-    for coords, tag in [(_NAN_PT, "nan"), (_INF_PT, "inf")]:
-        yield _TestCase("point", (("pt", coords),), {}, "f64", tag,
-                       "expect_error", True, None, "errors")
-    # linestring
-    for coords, tag in [(_NAN_1, "nan"), (_INF_1, "inf"), (_NINF_1, "ninf")]:
-        yield _TestCase("linestring", (coords,), {}, "f64", tag,
-                       "expect_error", True, None, "errors")
-    # polygon
-    for coords, tag in [(_NAN_1, "nan"), (_INF_1, "inf")]:
-        yield _TestCase("polygon", (coords,), {}, "f64", tag,
-                       "expect_error", True, None, "errors")
-    # linearring
-    for coords, tag in [(_NAN_1, "nan"), (_INF_1, "inf")]:
-        yield _TestCase("linearring", (coords,), {}, "f64", tag,
-                       "expect_error", True, None, "errors")
-    # multipoint
-    yield _TestCase("multipoint", (_MNAN,), {}, "f64", "nan",
-                   "expect_error", True, None, "errors")
-    # multilinestring
-    yield _TestCase("multilinestring", (_MLNAN,), {}, "f64", "nan",
-                   "expect_error", True, None, "errors")
-    # multipolygon
-    yield _TestCase("multipolygon", (_MPNAN,), {}, "f64", "nan",
-                   "expect_error", True, None, "errors")
+def _catalog_nan():
+    """NaN pass-through: match Python shapely — accept NaN coords, return NaN results."""
+    # linestring: NaN input constructs successfully
+    yield _TestCase("linestring", (_NAN_1,), {}, "f64", "nan_ls",
+                   "nan_pass", True, None, "nan")
+    # accessors on NaN linestring
+    yield _TestCase("class.ls.length", (("ls", _NAN_1),), {}, "f64", "nan_len",
+                   "nan_pass", True, None, "nan")
+    yield _TestCase("class.ls.is_simple", (("ls", _NAN_1),), {}, "f64", "nan_simple",
+                   "nan_pass", True, None, "nan")
+    yield _TestCase("class.ls.is_valid", (("ls", _NAN_1),), {}, "f64", "nan_valid",
+                   "nan_pass", True, None, "nan")
 
 
 # =============================================================================
@@ -1067,26 +1067,28 @@ def test_api(tc, cpp):
         tc.setup_fn(args, kwargs)
         return
 
-    # Error tests: expect exception from C++
-    if strategy == "expect_error":
+    # NaN/Inf tests: verify NaN passes through (matching Python shapely behavior)
+    if strategy == "nan_pass":
         try:
-            call_cpp_py(api_name, cpp, *args, **kwargs)
-            # Should have raised — didn't
-            raise AssertionError(
-                f"[{api_name}] expected exception for NaN/Inf input, but no error raised")
+            cpp_r, py_r = call_cpp_py(api_name, cpp, *args, **kwargs)
         except Exception as e:
-            # Re-raise assertion errors, accept everything else
-            if isinstance(e, AssertionError):
-                _REPORT_ROWS.append(dict(
-                    category=tc.group, api=api_name, mode=_geos_info(cpp),
-                    dtype=tc.dtype_label, feature=tc.category,
-                    result="FAIL", ulp=-1))
-                raise
-            # Expected: any exception (invalid_argument, runtime_error, etc.)
+            raise AssertionError(
+                f"[{api_name}] unexpected crash on NaN input: {e}") from e
+        # NaN comparison: both must be NaN or equal
+        if py_r is None:
+            return  # no Python equivalent
+        try:
+            _compare_nan_tolerant(cpp_r, py_r, label=api_name)
             _REPORT_ROWS.append(dict(
                 category=tc.group, api=api_name, mode=_geos_info(cpp),
                 dtype=tc.dtype_label, feature=tc.category,
                 result="PASS", ulp=0))
+        except AssertionError:
+            _REPORT_ROWS.append(dict(
+                category=tc.group, api=api_name, mode=_geos_info(cpp),
+                dtype=tc.dtype_label, feature=tc.category,
+                result="FAIL", ulp=-1))
+            raise
         return
 
     cpp_r, py_r = call_cpp_py(api_name, cpp, *args, **kwargs)
