@@ -230,6 +230,11 @@ ops,interpolate_linestring,unknown,f64,v_mid,PASS,0
 ops,interpolate_linestring,unknown,f64,h_start,PASS,0
 ops,interpolate_linestring,unknown,f64,h_end,PASS,0
 ops,interpolate_linestring,unknown,f64,v3pt,PASS,0
+ops,interpolate_linestring_normalized,unknown,f64,h_mid,PASS,0
+ops,interpolate_linestring_normalized,unknown,f64,h_start,PASS,0
+ops,interpolate_linestring_normalized,unknown,f64,h_end,PASS,0
+ops,interpolate_linestring_normalized,unknown,f64,v_mid,PASS,0
+ops,interpolate_linestring_normalized,unknown,f64,v3pt_end,PASS,0
 ops,centroid_point,unknown,f64,3-4,PASS,0
 ops,centroid_point,unknown,f64,neg,PASS,0
 ops,centroid_linestring,unknown,f64,d,PASS,0

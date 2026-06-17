@@ -121,7 +121,7 @@ public:
 
     // -- Topology --
     template <typename U> double project(const Point<U>& other) const;
-    Point<double> interpolate(double distance) const;
+    Point<double> interpolate(double distance, bool normalized = false) const;
     Point<double> centroid() const;
     Polygon<double> buffer(double distance) const;
 
@@ -344,9 +344,17 @@ double LineString<T>::project(const Point<U>& o) const {
 
 // Python: base.py::interpolate:L915
 template <typename T>
-Point<double> LineString<T>::interpolate(double distance) const {
+Point<double> LineString<T>::interpolate(double distance, bool normalized) const {
+    double abs_dist;
+    if (normalized) {
+        if (distance < 0.0) distance = 0.0;
+        if (distance > 1.0) distance = 1.0;
+        abs_dist = distance * this->length();
+    } else {
+        abs_dist = distance;
+    }
     geos::linearref::LengthIndexedLine lil(geos_linestring_.get());
-    auto c = lil.extractPoint(distance);
+    auto c = lil.extractPoint(abs_dist);
     return Point<double>(c.x, c.y);
 }
 

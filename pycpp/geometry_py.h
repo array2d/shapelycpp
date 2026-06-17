@@ -444,6 +444,10 @@ inline std::tuple<double,double> centroid_polygon(const Polygon<double>& p) { au
 
 inline double project_ls_pt(const LineString<double>& l, const Point<double>& p) { return l.project(p); }
 inline std::tuple<double,double> interpolate_ls(const LineString<double>& l, double d) { auto r=l.interpolate(d); return {r.x,r.y}; }
+inline std::tuple<double,double> interpolate_ls_normalized(const LineString<double>& l, double t) {
+    auto r = l.interpolate(t, true);
+    return {r.x, r.y};
+}
 
 inline double intersection_area_poly_poly(const Polygon<double>& p1, const Polygon<double>& p2) {
     return p1.intersection(p2).area();

@@ -147,6 +147,7 @@ _INTERSECTS_RE = re.compile(r'^intersects_(linestring|polygon)_(linestring|polyg
 _OPS_NAMES = {
     "centroid_point", "centroid_linestring", "centroid_polygon",
     "project_linestring_point", "interpolate_linestring",
+    "interpolate_linestring_normalized",
     "intersection_area_polygon_polygon",
     "polygon_exterior",
     "nearest_points", "nearest_points_ls_pt",
@@ -354,6 +355,14 @@ def _call_ops(api_name, cpp, *args, **kwargs):
         dist = float(extras[0]) if extras else 5.0
         c_result = cpp.interpolate_linestring(c_ls, dist)
         py_pt = py_ls.interpolate(dist)
+        return np.array(c_result), np.array((py_pt.x, py_pt.y))
+
+    if api_name == "interpolate_linestring_normalized":
+        c_ls = _build_cpp_geom(cpp, *geoms[0])
+        py_ls = _build_py_geom(*geoms[0])
+        t = float(extras[0]) if extras else 0.5
+        c_result = cpp.interpolate_linestring_normalized(c_ls, t)
+        py_pt = py_ls.interpolate(t, normalized=True)
         return np.array(c_result), np.array((py_pt.x, py_pt.y))
 
     if api_name == "intersection_area_polygon_polygon":
@@ -878,6 +887,17 @@ def _catalog_ops():
     ]:
         yield _TestCase("interpolate_linestring", (ls, dist), {}, "f64", tag,
                        "bit_exact", True, None, "ops")
+
+    # -- interpolate_linestring_normalized --
+    for ls, t, py_t_expected_tag, tag in [
+        (("ls", _L_H), 0.5, "h_mid", "h_mid"),       # t=0.5 → midpoint of 10-length horizontal
+        (("ls", _L_H), 0.0, "h_start", "h_start"),   # t=0.0 → start
+        (("ls", _L_H), 1.0, "h_end", "h_end"),        # t=1.0 → end
+        (("ls", _L_V), 0.5, "v_mid", "v_mid"),        # vertical 10-length, t=0.5
+        (("ls", _L_3), 1.0, "v3pt", "v3pt_end"),      # 3-point L, t=1.0
+    ]:
+        yield _TestCase("interpolate_linestring_normalized", (ls, t), {},
+                       "f64", tag, "bit_exact", True, None, "ops")
 
     # -- Centroid --
     for name, geom, tag in [
