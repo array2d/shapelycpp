@@ -388,8 +388,8 @@ PYBIND11_MODULE(shapelycpp, m) {
     // Project / interpolate (from pycpp)
     // ======================================================================
     m.def("project_linestring_point",   &project_ls_pt);
-    m.def("interpolate_linestring",    &interpolate_ls);
-    m.def("interpolate_linestring_normalized", &interpolate_ls_normalized);
+    m.def("interpolate_linestring",    &interpolate_ls,
+          py::arg("ls"), py::arg("distance"), py::arg("normalized") = false);
 
     // ======================================================================
     // Intersection area (from pycpp)

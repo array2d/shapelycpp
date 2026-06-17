@@ -147,7 +147,6 @@ _INTERSECTS_RE = re.compile(r'^intersects_(linestring|polygon)_(linestring|polyg
 _OPS_NAMES = {
     "centroid_point", "centroid_linestring", "centroid_polygon",
     "project_linestring_point", "interpolate_linestring",
-    "interpolate_linestring_normalized",
     "intersection_area_polygon_polygon",
     "polygon_exterior",
     "nearest_points", "nearest_points_ls_pt",
@@ -353,16 +352,12 @@ def _call_ops(api_name, cpp, *args, **kwargs):
         c_ls = _build_cpp_geom(cpp, *geoms[0])
         py_ls = _build_py_geom(*geoms[0])
         dist = float(extras[0]) if extras else 5.0
-        c_result = cpp.interpolate_linestring(c_ls, dist)
-        py_pt = py_ls.interpolate(dist)
-        return np.array(c_result), np.array((py_pt.x, py_pt.y))
-
-    if api_name == "interpolate_linestring_normalized":
-        c_ls = _build_cpp_geom(cpp, *geoms[0])
-        py_ls = _build_py_geom(*geoms[0])
-        t = float(extras[0]) if extras else 0.5
-        c_result = cpp.interpolate_linestring_normalized(c_ls, t)
-        py_pt = py_ls.interpolate(t, normalized=True)
+        normalized = bool(kwargs.get("normalized", False))
+        if normalized:
+            c_result = cpp.interpolate_linestring(c_ls, dist, normalized=True)
+        else:
+            c_result = cpp.interpolate_linestring(c_ls, dist)
+        py_pt = py_ls.interpolate(dist, normalized=normalized)
         return np.array(c_result), np.array((py_pt.x, py_pt.y))
 
     if api_name == "intersection_area_polygon_polygon":
@@ -533,6 +528,19 @@ _MLS   = [[(0, 0), (5, 0)], [(10, 0), (15, 0)]]
 _MPOLY = [_SQ, _SQ3]
 _I_A   = [(0, 0), (5, 0), (5, 5), (0, 5)]
 _I_B   = [(3, 0), (8, 0), (8, 5), (3, 5)]
+
+# ---- NaN/Inf test data presets ------------------------------------------------
+
+_NAN_1 = [(float('nan'), 0), (1, 1)]
+_INF_1 = [(float('inf'), 0), (1, 1)]
+_NINF_1= [(float('-inf'), 0), (1, 1)]
+_NAN_PT = (float('nan'), 0)
+_INF_PT = (float('inf'), 0)
+
+_MNAN  = [(float('nan'), 0), (10, 10), (20, 5)]        # multipoint nan
+_MLNAN = [[(float('nan'), 0), (5, 0)], [(10, 0), (15, 0)]]  # multiline nan
+_MPNAN = [[(0, 0), (10, 0), (10, 10), (0, 10)],      # multipoly nan
+          [(float('nan'), 0), (20, 0), (20, 10), (10, 10)]]
 
 
 # ---- Group 1: factories (7 APIs) --------------------------------------------
@@ -877,7 +885,7 @@ def _catalog_ops():
         yield _TestCase("project_linestring_point", (ls, pt), {}, "f64", tag,
                        "scalar_eq", True, None, "ops")
 
-    # -- interpolate_linestring --
+    # -- interpolate_linestring (absolute distance) --
     for ls, dist, tag in [
         (("ls", _L_H), 5.0, "h_mid"),
         (("ls", _L_V), 5.0, "v_mid"),
@@ -888,15 +896,15 @@ def _catalog_ops():
         yield _TestCase("interpolate_linestring", (ls, dist), {}, "f64", tag,
                        "bit_exact", True, None, "ops")
 
-    # -- interpolate_linestring_normalized --
-    for ls, t, py_t_expected_tag, tag in [
-        (("ls", _L_H), 0.5, "h_mid", "h_mid"),       # t=0.5 → midpoint of 10-length horizontal
-        (("ls", _L_H), 0.0, "h_start", "h_start"),   # t=0.0 → start
-        (("ls", _L_H), 1.0, "h_end", "h_end"),        # t=1.0 → end
-        (("ls", _L_V), 0.5, "v_mid", "v_mid"),        # vertical 10-length, t=0.5
-        (("ls", _L_3), 1.0, "v3pt", "v3pt_end"),      # 3-point L, t=1.0
+    # -- interpolate_linestring (normalized) -- same API, kwargs={"normalized": True}
+    for ls, t, tag in [
+        (("ls", _L_H), 0.5, "norm_h_mid"),
+        (("ls", _L_H), 0.0, "norm_h_start"),
+        (("ls", _L_H), 1.0, "norm_h_end"),
+        (("ls", _L_V), 0.5, "norm_v_mid"),
+        (("ls", _L_3), 1.0, "norm_v3pt_end"),
     ]:
-        yield _TestCase("interpolate_linestring_normalized", (ls, t), {},
+        yield _TestCase("interpolate_linestring", (ls, t), {"normalized": True},
                        "f64", tag, "bit_exact", True, None, "ops")
 
     # -- Centroid --
@@ -955,6 +963,37 @@ def api_catalog():
         yield tc._replace(group="predicates")
     for tc in _catalog_ops():
         yield tc._replace(group="ops")
+    for tc in _catalog_errors():
+        yield tc._replace(group="errors")
+
+
+def _catalog_errors():
+    """NaN/Inf rejection: every geometry factory must reject NaN/Inf coords."""
+    # point
+    for coords, tag in [(_NAN_PT, "nan"), (_INF_PT, "inf")]:
+        yield _TestCase("point", (("pt", coords),), {}, "f64", tag,
+                       "expect_error", True, None, "errors")
+    # linestring
+    for coords, tag in [(_NAN_1, "nan"), (_INF_1, "inf"), (_NINF_1, "ninf")]:
+        yield _TestCase("linestring", (coords,), {}, "f64", tag,
+                       "expect_error", True, None, "errors")
+    # polygon
+    for coords, tag in [(_NAN_1, "nan"), (_INF_1, "inf")]:
+        yield _TestCase("polygon", (coords,), {}, "f64", tag,
+                       "expect_error", True, None, "errors")
+    # linearring
+    for coords, tag in [(_NAN_1, "nan"), (_INF_1, "inf")]:
+        yield _TestCase("linearring", (coords,), {}, "f64", tag,
+                       "expect_error", True, None, "errors")
+    # multipoint
+    yield _TestCase("multipoint", (_MNAN,), {}, "f64", "nan",
+                   "expect_error", True, None, "errors")
+    # multilinestring
+    yield _TestCase("multilinestring", (_MLNAN,), {}, "f64", "nan",
+                   "expect_error", True, None, "errors")
+    # multipolygon
+    yield _TestCase("multipolygon", (_MPNAN,), {}, "f64", "nan",
+                   "expect_error", True, None, "errors")
 
 
 # =============================================================================
@@ -1026,6 +1065,28 @@ def test_api(tc, cpp):
 
     if tc.setup_fn is not None:
         tc.setup_fn(args, kwargs)
+        return
+
+    # Error tests: expect exception from C++
+    if strategy == "expect_error":
+        try:
+            call_cpp_py(api_name, cpp, *args, **kwargs)
+            # Should have raised — didn't
+            raise AssertionError(
+                f"[{api_name}] expected exception for NaN/Inf input, but no error raised")
+        except Exception as e:
+            # Re-raise assertion errors, accept everything else
+            if isinstance(e, AssertionError):
+                _REPORT_ROWS.append(dict(
+                    category=tc.group, api=api_name, mode=_geos_info(cpp),
+                    dtype=tc.dtype_label, feature=tc.category,
+                    result="FAIL", ulp=-1))
+                raise
+            # Expected: any exception (invalid_argument, runtime_error, etc.)
+            _REPORT_ROWS.append(dict(
+                category=tc.group, api=api_name, mode=_geos_info(cpp),
+                dtype=tc.dtype_label, feature=tc.category,
+                result="PASS", ulp=0))
         return
 
     cpp_r, py_r = call_cpp_py(api_name, cpp, *args, **kwargs)

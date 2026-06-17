@@ -22,6 +22,7 @@
 #include "../shapely/geometry/geometrycollection.h"
 
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <tuple>
 #include <vector>
@@ -66,6 +67,20 @@ inline void ensure_c_contiguous(const py::buffer_info& buf) {
     }
 }
 
+/// Validate coordinate buffer — reject NaN/Inf before they reach GEOS.
+/// Throws std::invalid_argument with the index of the first offending value.
+template <typename T>
+inline void ensure_no_nan_inf(const T* data, size_t count, const char* label = "coords") {
+    for (size_t i = 0; i < count; ++i) {
+        if (std::isnan(data[i]))
+            throw std::invalid_argument(
+                std::string(label) + " contains NaN at index " + std::to_string(i));
+        if (std::isinf(data[i]))
+            throw std::invalid_argument(
+                std::string(label) + " contains Inf at index " + std::to_string(i));
+    }
+}
+
 /// Convert any py::array coordinate buffer to std::vector<double>.
 /// Extracts the first 2 columns per row — safe for (N,2) and (N,≥3) arrays.
 /// dtype double → direct copy; float32/other → cast & widen to double.
@@ -96,6 +111,8 @@ inline std::vector<double> array_to_double_vec(const py::array& arr) {
             tmp[r * 2 + 1] = static_cast<double>(src[base + 1]);
         }
     }
+    // Validate AFTER conversion: reject NaN/Inf before GEOS
+    ensure_no_nan_inf(tmp.data(), rows * 2, "coords");
     return tmp;
 }
 
@@ -104,13 +121,20 @@ inline std::vector<double> array_to_double_vec(const py::array& arr) {
 // ============================================================================
 
 // -- Point: scalar (x,y) + array ([x,y]) forms --
-inline Point<double> point(double x, double y) { return Point<double>(x, y); }
+inline Point<double> point(double x, double y) {
+    if (std::isnan(x) || std::isnan(y))
+        throw std::invalid_argument("point coords contains NaN");
+    if (std::isinf(x) || std::isinf(y))
+        throw std::invalid_argument("point coords contains Inf");
+    return Point<double>(x, y);
+}
 inline Point<float>  point(float x, float y)  { return Point<float>(x, y); }
 
 inline Point<double> point(const py::array_t<double>& arr) {
     auto buf = arr.request();
     ensure_c_contiguous(buf);
     const double* p = static_cast<const double*>(buf.ptr);
+    ensure_no_nan_inf(p, buf.size, "point coords");
     return Point<double>(buf.size > 0 ? p[0] : 0, buf.size > 1 ? p[1] : 0);
 }
 // float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
@@ -118,8 +142,13 @@ inline Point<double> point(const py::array_t<float>& arr) {
     auto buf = arr.request();
     ensure_c_contiguous(buf);
     const float* p = static_cast<const float*>(buf.ptr);
-    return Point<double>(buf.size > 0 ? static_cast<double>(p[0]) : 0,
-                         buf.size > 1 ? static_cast<double>(p[1]) : 0);
+    double x = buf.size > 0 ? static_cast<double>(p[0]) : 0;
+    double y = buf.size > 1 ? static_cast<double>(p[1]) : 0;
+    if (std::isnan(x) || std::isnan(y))
+        throw std::invalid_argument("point coords contains NaN");
+    if (std::isinf(x) || std::isinf(y))
+        throw std::invalid_argument("point coords contains Inf");
+    return Point<double>(x, y);
 }
 // auto-double: accept any dtype (int, unknown), always produce Point<double>
 // Handles 1D [x,y] and 2D (N,≥2) arrays — takes first 2 elements.
@@ -127,22 +156,30 @@ inline Point<double> point(const py::array& arr) {
     auto buf = arr.request();
     ensure_c_contiguous(buf);
     if (buf.size < 2) return Point<double>(0, 0);
+    double x, y;
     if (arr.dtype().is(py::dtype::of<double>())) {
         const double* p = static_cast<const double*>(buf.ptr);
-        return Point<double>(p[0], p[1]);
+        x = p[0]; y = p[1];
     } else {
         // float32 or int/other → cast through pybind11 to float32, then widen
         auto f32 = py::cast<py::array_t<float>>(arr);
         auto fbuf = f32.request();
         const float* p = static_cast<const float*>(fbuf.ptr);
-        return Point<double>(static_cast<double>(p[0]), static_cast<double>(p[1]));
+        x = static_cast<double>(p[0]);
+        y = static_cast<double>(p[1]);
     }
+    if (std::isnan(x) || std::isnan(y))
+        throw std::invalid_argument("point coords contains NaN");
+    if (std::isinf(x) || std::isinf(y))
+        throw std::invalid_argument("point coords contains Inf");
+    return Point<double>(x, y);
 }
 
 // -- LineString --
 inline LineString<double> linestring(const py::array_t<double>& arr) {
     auto buf = arr.request();
     ensure_c_contiguous(buf);
+    ensure_no_nan_inf(static_cast<const double*>(buf.ptr), buf.size, "linestring coords");
     return LineString<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 // float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
@@ -167,6 +204,7 @@ inline LineString<double> linestring(const std::vector<std::array<double, 2>>& p
         flat[i * 2] = pts[i][0];
         flat[i * 2 + 1] = pts[i][1];
     }
+    ensure_no_nan_inf(flat.data(), pts.size() * 2, "linestring coords");
     return LineString<double>(flat.data(), pts.size(), 2);
 }
 
@@ -174,6 +212,7 @@ inline LineString<double> linestring(const std::vector<std::array<double, 2>>& p
 inline Polygon<double> polygon(const py::array_t<double>& arr) {
     auto buf = arr.request();
     ensure_c_contiguous(buf);
+    ensure_no_nan_inf(static_cast<const double*>(buf.ptr), buf.size, "polygon coords");
     return Polygon<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 // float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
@@ -192,6 +231,7 @@ inline Polygon<double> polygon(const py::array& arr) {
 inline LinearRing<double> linearring(const py::array_t<double>& arr) {
     auto buf = arr.request();
     ensure_c_contiguous(buf);
+    ensure_no_nan_inf(static_cast<const double*>(buf.ptr), buf.size, "linearring coords");
     return LinearRing<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 inline LinearRing<double> linearring(const py::array& arr) {
@@ -204,6 +244,7 @@ inline LinearRing<double> linearring(const py::array& arr) {
 inline MultiPoint<double> multipoint(const py::array_t<double>& arr) {
     auto buf = arr.request();
     ensure_c_contiguous(buf);
+    ensure_no_nan_inf(static_cast<const double*>(buf.ptr), buf.size, "multipoint coords");
     return MultiPoint<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 // float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
@@ -224,6 +265,7 @@ inline MultiLineString<double> multilinestring(const std::vector<py::array_t<dou
     for (auto& arr : arrays) {
         auto buf = arr.request();
         ensure_c_contiguous(buf);
+        ensure_no_nan_inf(static_cast<const double*>(buf.ptr), buf.size, "multilinestring coords");
         mls.add_line(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
     }
     return mls;
@@ -254,6 +296,7 @@ inline MultiPolygon<double> multipolygon(const std::vector<py::array_t<double>>&
     for (auto& arr : arrays) {
         auto buf = arr.request();
         ensure_c_contiguous(buf);
+        ensure_no_nan_inf(static_cast<const double*>(buf.ptr), buf.size, "multipolygon coords");
         mp.add_polygon(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
     }
     return mp;
@@ -443,9 +486,8 @@ inline std::tuple<double,double> centroid_linestring(const LineString<double>& l
 inline std::tuple<double,double> centroid_polygon(const Polygon<double>& p) { auto r=p.centroid(); return {r.x,r.y}; }
 
 inline double project_ls_pt(const LineString<double>& l, const Point<double>& p) { return l.project(p); }
-inline std::tuple<double,double> interpolate_ls(const LineString<double>& l, double d) { auto r=l.interpolate(d); return {r.x,r.y}; }
-inline std::tuple<double,double> interpolate_ls_normalized(const LineString<double>& l, double t) {
-    auto r = l.interpolate(t, true);
+inline std::tuple<double,double> interpolate_ls(const LineString<double>& l, double d, bool normalized = false) {
+    auto r = l.interpolate(d, normalized);
     return {r.x, r.y};
 }
 
