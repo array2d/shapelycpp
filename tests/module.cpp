@@ -17,12 +17,13 @@
 namespace py = pybind11;
 using namespace shapely::geometry;
 using namespace shapely_py;
+using namespace shapely_py::detail;
 
 // Re-export native_to_array for module-local use (templated)
 namespace {
 template <typename T>
 py::array_t<T> _native_to_array(const T* data, size_t rows, size_t cols) {
-    return shapely_py::native_to_array(data, rows, cols);
+    return shapely_py::detail::native_to_array(data, rows, cols);
 }
 }
 
@@ -385,11 +386,14 @@ PYBIND11_MODULE(shapelycpp, m) {
     m.def("intersects_polygon_polygon",    &intersects_poly_poly);
 
     // ======================================================================
-    // Project / interpolate (from pycpp)
+    // Project / interpolate (inlined from pycpp — no standalone helpers)
     // ======================================================================
-    m.def("project_linestring_point",   &project_ls_pt);
+    m.def("project_linestring_point", [](const LineString<double>& l, const Point<double>& p) {
+        return l.project(p);
+    }, py::arg("ls"), py::arg("pt"));
     m.def("interpolate_linestring", [](const LineString<double>& ls, double dist, bool normalized) {
-        return interpolate_ls(ls, dist, normalized);
+        auto r = ls.interpolate(dist, normalized);
+        return std::make_tuple(r.x, r.y);
     }, py::arg("ls"), py::arg("distance"), py::arg("normalized") = false);
 
     // ======================================================================
