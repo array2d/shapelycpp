@@ -414,6 +414,37 @@ class TestLineStringInterpolate:
         assert x == py_pt.x; assert y == py_pt.y
 
 
+class TestLineStringInterpolateNormalized:
+    """Verify interpolate_ls(ls, t, normalized=True) matches Python."""
+    LINE = [(0,0),(10,0),(10,10)]  # L-shaped
+    LINE_CURVED = [(0,0),(3,4),(6,0),(9,4),(12,0)]  # curved path
+
+    @pytest.mark.parametrize("line,t", [
+        (LINE, 0.0), (LINE, 0.25), (LINE, 0.5), (LINE, 0.75), (LINE, 1.0),
+        (LINE_CURVED, 0.0), (LINE_CURVED, 0.2), (LINE_CURVED, 0.5),
+        (LINE_CURVED, 0.8), (LINE_CURVED, 1.0),
+    ])
+    def test_values(self, cpp, line, t):
+        x, y = cpp.interpolate_linestring(cpp.linestring(line), t, True)
+        py_pt = PyLineString(line).interpolate(t, normalized=True)
+        assert x == py_pt.x, f"x: {x} != {py_pt.x}"
+        assert y == py_pt.y, f"y: {y} != {py_pt.y}"
+
+    def test_random_lines(self, cpp):
+        """Random lines with exact comparison."""
+        np.random.seed(42)
+        for _ in range(100):
+            n = np.random.randint(2, 10)
+            pts = np.random.randn(n, 2) * 50
+            pts[:, 0] += np.arange(n) * 10
+            line = pts.tolist()
+            for t in np.linspace(0, 1, 11):
+                x, y = cpp.interpolate_linestring(cpp.linestring(line), float(t), True)
+                py_pt = PyLineString(line).interpolate(float(t), normalized=True)
+                assert x == py_pt.x, f"random line: x {x} != {py_pt.x} at t={t}"
+                assert y == py_pt.y, f"random line: y {y} != {py_pt.y} at t={t}"
+
+
 # =============================================================================
 # Polygon accessors + same-type distance
 # =============================================================================
