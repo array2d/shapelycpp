@@ -32,8 +32,9 @@ using namespace shapely::geometry;
 namespace shapely_py {
 
 // ============================================================================
-// Internal helpers
+// Internal helpers — hidden in detail namespace
 // ============================================================================
+namespace detail {
 
 /// Copy native T* data to a Python numpy array.
 template <typename T>
@@ -99,6 +100,8 @@ inline std::vector<double> array_to_double_vec(const py::array& arr) {
     return tmp;
 }
 
+} // namespace detail
+
 // ============================================================================
 // Factory functions — all overloaded, no _f32 suffixes
 // ============================================================================
@@ -109,14 +112,14 @@ inline Point<float>  point(float x, float y)  { return Point<float>(x, y); }
 
 inline Point<double> point(const py::array_t<double>& arr) {
     auto buf = arr.request();
-    ensure_c_contiguous(buf);
+    detail::ensure_c_contiguous(buf);
     const double* p = static_cast<const double*>(buf.ptr);
     return Point<double>(buf.size > 0 ? p[0] : 0, buf.size > 1 ? p[1] : 0);
 }
 // float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
 inline Point<double> point(const py::array_t<float>& arr) {
     auto buf = arr.request();
-    ensure_c_contiguous(buf);
+    detail::ensure_c_contiguous(buf);
     const float* p = static_cast<const float*>(buf.ptr);
     return Point<double>(buf.size > 0 ? static_cast<double>(p[0]) : 0,
                          buf.size > 1 ? static_cast<double>(p[1]) : 0);
@@ -125,7 +128,7 @@ inline Point<double> point(const py::array_t<float>& arr) {
 // Handles 1D [x,y] and 2D (N,≥2) arrays — takes first 2 elements.
 inline Point<double> point(const py::array& arr) {
     auto buf = arr.request();
-    ensure_c_contiguous(buf);
+    detail::ensure_c_contiguous(buf);
     if (buf.size < 2) return Point<double>(0, 0);
     if (arr.dtype().is(py::dtype::of<double>())) {
         const double* p = static_cast<const double*>(buf.ptr);
@@ -142,18 +145,18 @@ inline Point<double> point(const py::array& arr) {
 // -- LineString --
 inline LineString<double> linestring(const py::array_t<double>& arr) {
     auto buf = arr.request();
-    ensure_c_contiguous(buf);
+    detail::ensure_c_contiguous(buf);
     return LineString<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 // float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
 inline LineString<double> linestring(const py::array_t<float>& arr) {
     py::ssize_t n = arr.request().shape[0];
-    auto tmp = array_to_double_vec(arr);
+    auto tmp = detail::array_to_double_vec(arr);
     return LineString<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 inline LineString<double> linestring(const py::array& arr) {
     py::ssize_t n = arr.request().shape[0];
-    auto tmp = array_to_double_vec(arr);
+    auto tmp = detail::array_to_double_vec(arr);
     return LineString<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 
@@ -173,48 +176,48 @@ inline LineString<double> linestring(const std::vector<std::array<double, 2>>& p
 // -- Polygon --
 inline Polygon<double> polygon(const py::array_t<double>& arr) {
     auto buf = arr.request();
-    ensure_c_contiguous(buf);
+    detail::ensure_c_contiguous(buf);
     return Polygon<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 // float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
 inline Polygon<double> polygon(const py::array_t<float>& arr) {
     py::ssize_t n = arr.request().shape[0];
-    auto tmp = array_to_double_vec(arr);
+    auto tmp = detail::array_to_double_vec(arr);
     return Polygon<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 inline Polygon<double> polygon(const py::array& arr) {
     py::ssize_t n = arr.request().shape[0];
-    auto tmp = array_to_double_vec(arr);
+    auto tmp = detail::array_to_double_vec(arr);
     return Polygon<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 
 // -- LinearRing (double only for now) --
 inline LinearRing<double> linearring(const py::array_t<double>& arr) {
     auto buf = arr.request();
-    ensure_c_contiguous(buf);
+    detail::ensure_c_contiguous(buf);
     return LinearRing<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 inline LinearRing<double> linearring(const py::array& arr) {
     py::ssize_t n = arr.request().shape[0];
-    auto tmp = array_to_double_vec(arr);
+    auto tmp = detail::array_to_double_vec(arr);
     return LinearRing<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 
 // -- MultiPoint: single array of shape (n_pts, 2) --
 inline MultiPoint<double> multipoint(const py::array_t<double>& arr) {
     auto buf = arr.request();
-    ensure_c_contiguous(buf);
+    detail::ensure_c_contiguous(buf);
     return MultiPoint<double>(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
 }
 // float32 auto-upcast: prevent GEOS precision mismatch vs Python shapely
 inline MultiPoint<double> multipoint(const py::array_t<float>& arr) {
     py::ssize_t n = arr.request().shape[0];
-    auto tmp = array_to_double_vec(arr);
+    auto tmp = detail::array_to_double_vec(arr);
     return MultiPoint<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 inline MultiPoint<double> multipoint(const py::array& arr) {
     py::ssize_t n = arr.request().shape[0];
-    auto tmp = array_to_double_vec(arr);
+    auto tmp = detail::array_to_double_vec(arr);
     return MultiPoint<double>(tmp.data(), static_cast<size_t>(n), 2);
 }
 
@@ -223,7 +226,7 @@ inline MultiLineString<double> multilinestring(const std::vector<py::array_t<dou
     MultiLineString<double> mls;
     for (auto& arr : arrays) {
         auto buf = arr.request();
-        ensure_c_contiguous(buf);
+        detail::ensure_c_contiguous(buf);
         mls.add_line(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
     }
     return mls;
@@ -233,7 +236,7 @@ inline MultiLineString<double> multilinestring(const std::vector<py::array_t<flo
     MultiLineString<double> mls;
     for (auto& arr : arrays) {
         py::ssize_t n = arr.request().shape[0];
-        auto tmp = array_to_double_vec(arr);
+        auto tmp = detail::array_to_double_vec(arr);
         mls.add_line(tmp.data(), static_cast<size_t>(n), 2);
     }
     return mls;
@@ -242,7 +245,7 @@ inline MultiLineString<double> multilinestring(const std::vector<py::array>& arr
     MultiLineString<double> mls;
     for (auto& arr : arrays) {
         py::ssize_t n = arr.request().shape[0];
-        auto tmp = array_to_double_vec(arr);
+        auto tmp = detail::array_to_double_vec(arr);
         mls.add_line(tmp.data(), static_cast<size_t>(n), 2);
     }
     return mls;
@@ -253,7 +256,7 @@ inline MultiPolygon<double> multipolygon(const std::vector<py::array_t<double>>&
     MultiPolygon<double> mp;
     for (auto& arr : arrays) {
         auto buf = arr.request();
-        ensure_c_contiguous(buf);
+        detail::ensure_c_contiguous(buf);
         mp.add_polygon(static_cast<const double*>(buf.ptr), buf.shape[0], buf.shape[1]);
     }
     return mp;
@@ -263,7 +266,7 @@ inline MultiPolygon<double> multipolygon(const std::vector<py::array_t<float>>& 
     MultiPolygon<double> mp;
     for (auto& arr : arrays) {
         py::ssize_t n = arr.request().shape[0];
-        auto tmp = array_to_double_vec(arr);
+        auto tmp = detail::array_to_double_vec(arr);
         mp.add_polygon(tmp.data(), static_cast<size_t>(n), 2);
     }
     return mp;
@@ -272,32 +275,33 @@ inline MultiPolygon<double> multipolygon(const std::vector<py::array>& arrays) {
     MultiPolygon<double> mp;
     for (auto& arr : arrays) {
         py::ssize_t n = arr.request().shape[0];
-        auto tmp = array_to_double_vec(arr);
+        auto tmp = detail::array_to_double_vec(arr);
         mp.add_polygon(tmp.data(), static_cast<size_t>(n), 2);
     }
     return mp;
 }
 
 // ============================================================================
-// Cross-type distance
+// Cross-type wrappers (distance, intersects, predicates, centroid, etc.)
+// Thin wrappers that bridge pybind11's cross-type dispatch limitation.
+// Hidden in detail — downstream code should use shapely::geometry methods directly.
 // ============================================================================
+namespace detail {
+
+// -- Cross-type distance --
 
 inline double distance_pt_ls(const Point<double>& p, const LineString<double>& l) { return p.distance(l); }
 inline double distance_pt_poly(const Point<double>& p, const Polygon<double>& poly) { return p.distance(poly); }
 inline double distance_ls_poly(const LineString<double>& l, const Polygon<double>& poly) { return l.distance(poly); }
 inline double distance_poly_ls(const Polygon<double>& poly, const LineString<double>& l) { return poly.distance(l); }
 
-// ============================================================================
-// Cross-type intersects
-// ============================================================================
+// -- Cross-type intersects --
 
 inline bool intersects_ls_poly(const LineString<double>& l, const Polygon<double>& poly) { return l.intersects(poly); }
 inline bool intersects_poly_ls(const Polygon<double>& poly, const LineString<double>& l) { return poly.intersects(l); }
 inline bool intersects_poly_poly(const Polygon<double>& p1, const Polygon<double>& p2) { return p1.intersects(p2); }
 
-// ============================================================================
-// Predicates — all 9 cross-type pairs
-// ============================================================================
+// -- Predicates — all 9 cross-type pairs --
 
 // -- Point ↔ Point --
 inline bool pt_contains_pt(const Point<double>& s, const Point<double>& o) { return s.contains(o); }
@@ -434,19 +438,11 @@ inline bool poly_intersects_poly(const Polygon<double>& s, const Polygon<double>
 inline std::string poly_relate_poly(const Polygon<double>& s, const Polygon<double>& o) { return s.relate(o); }
 inline double poly_hausdorff_distance_poly(const Polygon<double>& s, const Polygon<double>& o) { return s.hausdorff_distance(o); }
 
-// ============================================================================
-// Centroid, project, interpolate
-// ============================================================================
+// -- Centroid --
 
 inline std::tuple<double,double> centroid_point(const Point<double>& p) { auto r=p.centroid(); return {r.x,r.y}; }
 inline std::tuple<double,double> centroid_linestring(const LineString<double>& l) { auto r=l.centroid(); return {r.x,r.y}; }
 inline std::tuple<double,double> centroid_polygon(const Polygon<double>& p) { auto r=p.centroid(); return {r.x,r.y}; }
-
-inline double project_ls_pt(const LineString<double>& l, const Point<double>& p) { return l.project(p); }
-inline std::tuple<double,double> interpolate_ls(const LineString<double>& l, double d, bool normalized = false) {
-    auto r = l.interpolate(d, normalized);
-    return {r.x, r.y};
-}
 
 inline double intersection_area_poly_poly(const Polygon<double>& p1, const Polygon<double>& p2) {
     return p1.intersection(p2).area();
@@ -454,8 +450,10 @@ inline double intersection_area_poly_poly(const Polygon<double>& p1, const Polyg
 
 inline py::array_t<double> polygon_exterior(const Polygon<double>& p) {
     auto ext = p.exterior();
-    return native_to_array(ext.data(), ext.rows(), ext.cols());
+    return detail::native_to_array(ext.data(), ext.rows(), ext.cols());
 }
+
+} // namespace detail
 
 } // namespace shapely_py
 
@@ -464,20 +462,20 @@ inline py::array_t<double> polygon_exterior(const Polygon<double>& p) {
 // ============================================================================
 
 #define BIND_PREDS(m, SRC, TGT) \
-    m.def(#SRC "_contains_" #TGT, &shapely_py::SRC ## _contains_ ## TGT); \
-    m.def(#SRC "_within_" #TGT, &shapely_py::SRC ## _within_ ## TGT); \
-    m.def(#SRC "_crosses_" #TGT, &shapely_py::SRC ## _crosses_ ## TGT); \
-    m.def(#SRC "_disjoint_" #TGT, &shapely_py::SRC ## _disjoint_ ## TGT); \
-    m.def(#SRC "_overlaps_" #TGT, &shapely_py::SRC ## _overlaps_ ## TGT); \
-    m.def(#SRC "_touches_" #TGT, &shapely_py::SRC ## _touches_ ## TGT); \
-    m.def(#SRC "_covers_" #TGT, &shapely_py::SRC ## _covers_ ## TGT); \
-    m.def(#SRC "_covered_by_" #TGT, &shapely_py::SRC ## _covered_by_ ## TGT); \
-    m.def(#SRC "_equals_" #TGT, &shapely_py::SRC ## _equals_ ## TGT); \
-    m.def(#SRC "_equals_exact_" #TGT, &shapely_py::SRC ## _equals_exact_ ## TGT, \
+    m.def(#SRC "_contains_" #TGT, &shapely_py::detail::SRC ## _contains_ ## TGT); \
+    m.def(#SRC "_within_" #TGT, &shapely_py::detail::SRC ## _within_ ## TGT); \
+    m.def(#SRC "_crosses_" #TGT, &shapely_py::detail::SRC ## _crosses_ ## TGT); \
+    m.def(#SRC "_disjoint_" #TGT, &shapely_py::detail::SRC ## _disjoint_ ## TGT); \
+    m.def(#SRC "_overlaps_" #TGT, &shapely_py::detail::SRC ## _overlaps_ ## TGT); \
+    m.def(#SRC "_touches_" #TGT, &shapely_py::detail::SRC ## _touches_ ## TGT); \
+    m.def(#SRC "_covers_" #TGT, &shapely_py::detail::SRC ## _covers_ ## TGT); \
+    m.def(#SRC "_covered_by_" #TGT, &shapely_py::detail::SRC ## _covered_by_ ## TGT); \
+    m.def(#SRC "_equals_" #TGT, &shapely_py::detail::SRC ## _equals_ ## TGT); \
+    m.def(#SRC "_equals_exact_" #TGT, &shapely_py::detail::SRC ## _equals_exact_ ## TGT, \
           py::arg("self"), py::arg("other"), py::arg("tolerance")); \
-    m.def(#SRC "_intersects_" #TGT, &shapely_py::SRC ## _intersects_ ## TGT); \
-    m.def(#SRC "_relate_" #TGT, &shapely_py::SRC ## _relate_ ## TGT); \
-    m.def(#SRC "_hausdorff_distance_" #TGT, &shapely_py::SRC ## _hausdorff_distance_ ## TGT);
+    m.def(#SRC "_intersects_" #TGT, &shapely_py::detail::SRC ## _intersects_ ## TGT); \
+    m.def(#SRC "_relate_" #TGT, &shapely_py::detail::SRC ## _relate_ ## TGT); \
+    m.def(#SRC "_hausdorff_distance_" #TGT, &shapely_py::detail::SRC ## _hausdorff_distance_ ## TGT);
 
 #define BIND_ACCESSORS(CLS) \
     .def("wkt", &CLS::wkt) \
